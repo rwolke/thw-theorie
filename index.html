@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="de" manifest="app.manifest">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<link rel="apple-touch-icon" href="images/logo.png" />
+	<link rel="apple-touch-icon-precomposed" href="images/logo.png" />
+
+	<title>THW Theorie</title>
+	<link rel="stylesheet" href="thw.min.css" />
+	<link rel="stylesheet" href="jquery.mobile.structure-1.3.0.min.css" />
+	<script src="jquery-1.9.1.min.js"></script>
+	<script src="jquery.color-2.1.1.min.js"></script>
+	<script src="jquery.mobile-1.3.0.min.js"></script>
+	<script>
+		window.addEventListener('online', function(){});
+		window.addEventListener('offline', function(){});
+		
+		function THWTheorie() {
+			/*
+			 *  properties
+			 */
+			this.features = {
+				json : false,
+				localStorage : false,
+				applicationCache : false
+			};
+			this.currentVersion = {
+				// version necessary to trigger update for stored data
+				app : 0.1,
+				questions : 1
+			};
+			this.defaultSettings = {
+				savedVersion : {
+					app : 0,
+					questions : 0
+				},
+				randomizeQuestions : false
+//				showIntro : true,
+//				showChangelog : true,
+//				showFlashCardNotes : true,
+//				showExamNotes : true
+			};
+			this.loadedFromStorage = [];
+			this.questions = null;
+			this.flashcard;
+			this.settings;
+			
+			/*
+			 *  methods
+			 */
+			this.initStorage = function(name, fallback, doNotLoad) {
+				var obj = fallback;
+				// do testing
+				if(localStorage['THWTheorie_' + name] && (doNotLoad == null || !doNotLoad))
+					obj = JSON.parse(localStorage['THWTheorie_' + name]);
+				
+				if(this.features.localStorage)
+				{
+					obj.save = function() {
+						localStorage['THWTheorie_' + name] = JSON.stringify(this);
+					};
+					this.loadedFromStorage.push('THWTheorie_' + name);
+				}
+				else
+					obj.save = function() {};
+				return obj;
+			};
+			this.resetStorage = function() {
+				for(var i = 0; i < this.loadedFromStorage.length; i++)
+					if(localStorage[this.loadedFromStorage[i]])
+						delete localStorage[this.loadedFromStorage[i]];
+				this.statistic = new THWTheorie_Statistic(this, true);
+				this.flashcard = new THWTheorie_Flashcard(this, true);
+			}
+			this.upgradeQuestionCatalog = function() {
+				this.settings.savedVersion.questions = this.currentVersion.questions;
+				
+				this.statistic = new THWTheorie_Statistic(this, true);
+				this.flashcard = new THWTheorie_Flashcard(this, true);
+			}
+			
+			/*
+			 *  constructor
+			 */
+			// determine features of browser
+			try { this.features.json = typeof JSON == "object" && JSON && typeof JSON.parse == "function" && typeof JSON.stringify == "function"; } catch (e) {}
+			try { this.features.localStorage = 'localStorage' in window && window['localStorage'] !== null; } catch (e) {}
+			try { this.features.applicationCache = 'applicationCache' in window && window['applicationCache'] !== null; } catch (e) {}
+			
+			// JSON fallback
+			if(!this.features.json && this.features.localStorage)
+				$.ajax({
+					url: "json2.min.js",
+					async: false,
+					dataType: "script"
+				});
+			
+			// load settings
+			this.settings = this.initStorage('settings', this.defaultSettings);
+			
+			// perform update of app if necessary
+			if(this.settings.savedVersion.app < this.currentVersion.app)
+			{
+				// first run of app
+				if(this.settings.savedVersion.app == 0)
+					this.settings.savedVersion = this.currentVersion;
+				else // upgrade from some previous version
+				{}
+			}
+			
+			// handle new question catalog
+			var performReset = false;
+			if(
+				this.settings.savedVersion.questions < this.currentVersion.questions && 
+				confirm('Es gibt eine neue Version der Theorie-Fragen. Soll diese aktualisiert werden? (Der Lernfortschritt wird dabei zurückgesetzt.)')
+			)
+			{
+				this.settings.savedVersion.questions = this.currentVersion.questions;
+				performReset = true;
+			}
+			
+			// load questions
+			var that = this;
+			$.ajax({
+				async: false,
+				url: "questions_v" + this.settings.savedVersion.questions + ".json",
+				dataType: "json",
+				success: function(data) {
+					that.questions = data;
+				},
+				error: function() {
+					throw new Error('Fragenkatalog konnte nicht geladen werden!');
+				}
+			});
+			
+			this.statistic = new THWTheorie_Statistic(this, performReset);
+			this.flashcard = new THWTheorie_Flashcard(this, performReset);
+		}
+		
+		function THWTheorie_Statistic(owner, reset) {
+			/*
+			 *  properties
+			 */
+			this.owner = owner;
+			this.data = {
+				startTime : (new Date()).getTime(),
+				training : { total: 0, correct : 0 },
+				exam : { total: 0, correct : 0 }
+			};
+			
+			/*
+			 *  methods
+			 */
+			this.setTrainingResult = function(correct) {
+				this.data.training.total++;
+				if(correct)
+					this.data.training.correct++;
+				this.data.save();
+			};
+			this.setExamResult = function(correct) {
+				this.data.exam.total++;
+				if(correct)
+					this.data.exam.correct++;
+				this.data.save();
+			};
+			this.getStatistic = function() {
+				return this.data;
+			}
+			
+			/*
+			 *  constructor
+			 */
+			this.data = this.owner.initStorage('statistic', this.data, reset);
+		}
+		
+		function THWTheorie_Flashcard(owner, reset) {
+			this.owner = owner;
+			
+			/*
+			 *  properties
+			 */
+			// learn progress
+			this.progress = {
+				// entries in first box
+				box : [],
+				// entries in second box
+				other : [],
+				// confidence (how well the answer is known)
+				confidence : [] // questionIndex => confidenceValue
+			};
+			
+			// settings for noting progress
+			this.settings = {
+				// size of first learn box, i.e. repeat interval for wrong
+				//	answers
+				boxSize : 20,
+				// how to calculate learn leven of question, used as
+				//	new_confidence = expireFactor * old_confidence 
+				//	 + (1 - expireFactor) * (answeredCorrect ? 1 : 0);
+				expireFactor : 0.5
+			};
+			
+			/*
+			 *  methods
+			 */
+			this.setBoxSize = function(newSize){
+				if(newSize < 10 || newSize > 50)
+					return "Größe für Box muss zwischen 10 und 50 liegen";
+
+				this.settings.boxSize = newSize;
+				this.settings.save();
+
+				this.setMultipleQuestionResult();
+			};
+			this.setExpireFactor = function(factor){
+				if(factor < 0.1 || factor > 0.7)
+					return "Größe für den Faktor muss zwischen 0.1 und 0.7 liegen";
+
+				this.settings.expireFactor = factor;
+				this.settings.save();
+			};
+			this.getFirstQuestion = function() {
+				return this.progress.box[0];
+			}
+			this.setFirstQuestionResult = function(correct) {
+				// we got the result for the first question in the box
+				var q = this.progress.box[0];
+				var o = {};
+				o[q] = correct;
+				this.setMultipleQuestionResult(o);
+			}
+			this.setMultipleQuestionResult = function(q2result) {
+				if(q2result == null)
+					q2result = {};
+				
+				// update confidence
+				for(var q in q2result)
+				{
+					this.progress.confidence[q] = 
+						this.settings.expireFactor * this.progress.confidence[q]
+						+ (1 - this.settings.expireFactor) * (q2result[q] ? 1 : 0);
+					
+					this.owner.statistic.setTrainingResult(q2result[q]);
+				}
+				
+				var fullSortOfOtherNeeded = false;
+				var boxCorrect = [];
+				var boxIncorrect = [];
+				// get all questions of box that were answered 
+				for(var q in q2result)
+					if(this.progress.box.indexOf(parseInt(q)) != -1)
+					{
+						if(q2result[q])
+							boxCorrect.push(parseInt(q));
+						else
+							boxIncorrect.push(parseInt(q));
+						this.progress.box.splice(this.progress.box.indexOf(parseInt(q)), 1);
+					}
+					else
+						fullSortOfOtherNeeded = true;
+				
+				// empty box even more if necessary (needed in case of size change of box)
+				while(this.progress.box.length > this.settings.boxSize)
+					boxIncorrect.push(this.progress.box.pop());
+				
+				while(this.progress.box.length < this.settings.boxSize && boxIncorrect.length)
+					this.progress.box.push(boxIncorrect.shift());
+				
+				var leftOver = boxIncorrect.concat(boxCorrect);
+				if(fullSortOfOtherNeeded)
+				{
+					while(leftOver.length) 
+						this.progress.other.push(leftOver.shift());
+					
+					this.progress.other.sort(function(a,b){ 
+						return app.flashcard.progress.confidence[a] - app.flashcard.progress.confidence[b]; 
+					});
+				}
+				else
+					for(var j in leftOver)
+					{
+						var q = leftOver[j];
+						var c = this.progress.confidence[q];
+						var ins = this.progress.other.length;
+						for(var i = 0; i < this.progress.other.length; i++)
+							if(c < this.progress.confidence[this.progress.other[i]])
+							{
+								ins = i;
+								break;
+							}
+						this.progress.other.splice(ins, 0, q);
+					}
+				
+				// fill rest of box
+				while(this.progress.box.length < this.settings.boxSize)
+					this.progress.box.push(this.progress.other.shift());
+				
+				this.progress.save();
+			}
+			
+			/*
+			 *  constructor
+			 */
+			this.settings = this.owner.initStorage('flashcard_settings', this.settings);
+			this.progress = this.owner.initStorage('flashcard_progress', this.progress, reset);
+			if(!this.progress.box.length)
+			{
+				var q = [];
+				var qs = this.owner.questions.questions;
+				// fill q in random order
+				for(var i = 0; i < qs.length; i++)
+					q.splice(Math.floor(Math.random() * (q.length+1)), 0, i);
+				
+				// fill box and other & set no initial confidence
+				for(var i = 0; i < this.settings.boxSize; i++)
+					this.progress.box.push(q.shift());
+				while(q.length)
+					this.progress.other.push(q.shift());
+				for(var i = 0; i < qs.length; i++)
+					this.progress.confidence.push(0);
+				this.progress.save();
+			}
+		}
+		
+		function THWTheorie_UIHelper(app) {
+			this.app = app;
+			this.queue = {
+				queue : [],
+				add : function(callback) {
+					this.queue.push(callback);
+				},
+				run : function(exec) {
+					if(exec)
+						this.queue.shift()();
+					if(this.queue.length)
+						setTimeout(function(){ui.queue.run(true);}, 10);
+				}
+			};
+			this.displayQuestion = function(type, context, qid, option) {
+				var q = this.app.questions.questions[qid];
+				
+				html = '<h4 class="text">';
+				if(option.prefixTitle)
+					html += option.prefixTitle;
+				html += q.question;
+				if(option.setPostfix)
+					html += '<span class="onreveal"> (Frage ' + q.category + '.' + q.number + ')</span>';
+				html += '</h4>';
+
+				html += '<div data-role="fieldcontain">';
+				html += '<fieldset class="answers" data-qid="' + qid + '"data-role="controlgroup">';
+				
+				var answerOrder = [];
+				for(var no in q.answers)
+					if(!app.settings.randomizeQuestions || option.skipRandomize)
+						answerOrder.push(parseInt(no));
+					else
+						answerOrder.splice(Math.floor(Math.random() * (answerOrder.length+1)), 0, parseInt(no));
+				
+				for(var i = 0; i < answerOrder.length; i++)
+				{
+					var no = answerOrder[i];
+					
+					var correct = q.correct.indexOf(no) != -1;
+					var id = type + '_' + q.category + '_' + q.number + '_' + no;
+					html += '<input type="checkbox" id="' + id + '" ';
+					html += 'class="custom ' + (correct ? 'correct' : 'incorrect') + '" ';
+					if(option.setChecked && correct)
+						html += 'checked="checked" ';
+					html += '/>';
+					html += '<label for="' + id + '" class="' + (correct ? 'correct' : 'incorrect');
+					html += '">'+q.answers[no]+'</label>';
+				}
+				html += '</fieldset>';
+				html += '</div>';
+				
+				if(!context)
+					return html;
+				
+				context.removeClass('reveal').addClass('ask');
+				if(option.setTitle)
+					$('.title', context).text('Frage ' + q.category + '.' + q.number);
+				
+				$('.question', context).html(html).trigger('create');
+//				$('.answers input[type=checkbox]', context).checkboxradio();
+//				$('fieldset', context).controlgroup();
+			}
+		
+			this.learn = {
+				page : '#page-ask',
+				start : function() {
+					page = '#' + $.mobile.activePage.attr('id');
+					$(window).off('keydown').on('keydown', ui.learn.keyboard);
+					ui.learn.show();
+				},
+				show : function() {
+					var q = app.flashcard.getFirstQuestion();
+					ui.displayQuestion('ask', $(page), q, {
+						setTitle:true
+					});
+				},
+				check : function() {
+					$('#page-ask').removeClass('ask').addClass('reveal');
+					var correct = 1;
+					$('#page-ask .answers input').each(function(){
+						correct &= $(this).is(':checked') == $(this).hasClass('correct');
+					});
+					
+					$('#page-ask .question, #q-continue')
+						.removeClass('correct incorrect')
+						.addClass(correct ? 'correct' : 'incorrect');
+					
+					$('#q-continue .ui-btn-text').text(correct
+						? "Richtig! - Weiter zur nächsten Frage..."
+						: "Falsch! - Weiter zur nächsten Frage..."
+					);
+					
+					app.flashcard.setFirstQuestionResult(correct);
+				},
+				reveal : function() {
+					$('#page-show').removeClass('ask').addClass('reveal');
+				},
+				markResult : function(event) {
+					var id = $(event.target).parents('a').attr('id');
+					var correct = id == 'q-known';
+					
+					app.flashcard.setFirstQuestionResult(correct);
+					ui.learn.show();
+					return false;
+				},
+				keyboard : function(event) {
+					if($.inArray(event.which, [49,50,51,65,66,67]) != -1)
+					{
+						var k = event.which % 16 - 1;
+						if($(page + ' .answers input').length > k)
+							$(page + ' .answers input').eq(k).prop("checked", 
+								!$(page + ' .answers input').eq(k).is(':checked')
+							).checkboxradio("refresh");
+					}
+					else if($.inArray(event.which, [32,13,39]) != -1 && page == '#page-ask')
+						$($(page).hasClass('reveal') ? '#q-continue' : '#q-check').trigger('click');
+					else if($.inArray(event.which, [32,13,39]) != -1 && page == '#page-show' && $(page).hasClass('ask'))
+						$('#q-reveal').trigger('click');
+					else if(event.which == 37 && page == '#page-show' && $(page).hasClass('reveal')) // left arrow
+						$('#q-not-known').trigger('click');
+					else if(event.which == 39 && page == '#page-show' && $(page).hasClass('reveal')) // right arrow
+						$('#q-known').trigger('click');
+				}
+			};
+			this.questions = {
+				active : null,
+				printQuestionList : function(event,prev) {
+					ui.questions.active = null;
+					$(window).off('keydown').on('keydown', ui.questions.keyboard);
+					$('#page-questions').toggleClass('setFocus', 
+						prev.prevPage.attr('id') == 'page-main'
+					);
+					var cat = '';
+					for(var cid in app.questions.category)
+					{
+						var c = app.questions.category[cid];
+						cat += '<li data-role="list-divider">' + cid + '. ' + c.name;
+						cat += ' <span class="ui-li-count">' +c.list.length + '</span>';
+						cat += '</li>';
+
+						for(var qid in c.list)
+						{
+							var q = app.questions.questions[c.list[qid]];
+							cat += '<li data-filtertext="';
+							cat += q.category + '.' + q.number + ' ';
+							cat += q.question;
+							for(var i in q.answers)
+								cat += ' ' + q.answers[i];
+							cat += '"><a href="#popup-answer" data-rel="popup" data-q="' + c.list[qid] + '">';
+							cat += '<b>' + q.category + '.' + q.number + '</b> ';
+							cat += q.question + '</a></li>';
+						}
+					}
+					$('#page-questions ul').html(cat);
+					$('#page-questions ul').listview().listview('refresh');
+					$('#page-questions li a').on('click', function(){
+						ui.displayQuestion(
+							'answer', 
+							$('#popup-answer'), 
+							$(this).attr('data-q'), 
+							{setTitle:true,setChecked:true,skipRandomize:true}
+						);
+						return true;
+					});
+				},
+				afterDisplay : function() {
+					if($('#page-questions').hasClass('setFocus'))
+						$('#page-questions .ui-input-search input').focus();
+				},
+				getLastOrFirst : function(getTop) {
+					var lastTop = $('#page-questions li[data-filtertext]:visible').last().position().top < 
+						$('#page-questions li[data-filtertext]:visible').first().position().top;
+					if(lastTop == getTop)
+						return $('#page-questions li[data-filtertext]:visible').last();
+					return $('#page-questions li[data-filtertext]:visible').first();
+				} ,
+				findTopDisplayedQuestion : function() {
+					var e = ui.questions.getLastOrFirst(false);
+					$('#page-questions li[data-filtertext]:visible').each(function() {
+						if(
+							$(this).position().top > $(window).scrollTop() &&
+							(e.position().top > $(this).position().top)
+						)
+							e = $(this);
+					});
+					return e;
+				},
+				keyboard : function(event) {
+					if(ui.questions.active && ui.questions.active.length)
+						ui.questions.active.trigger('mouseout');
+						
+					if($.inArray(event.which, [33,34,38,40,39,37]) != -1 && (!ui.questions.active || !ui.questions.active.length))
+						ui.questions.active = ui.questions.findTopDisplayedQuestion();
+					else if($.inArray(event.which, [33,34,38,40]) != -1)
+					{
+						var i = (event.which > 35 ? 1 : 10) * (event.which % 5 == 3 ? -1 : 1);
+						if(!$('#page-questions li[data-filtertext]:visible').length) 
+							i = 0;
+						var e = ui.questions.active, e2;
+						while(i != 0)
+						{
+							e2 = i > 0 ? e.next('li') : e.prev('li');
+							if(!e2 || !e2.length)
+								e2 = ui.questions.getLastOrFirst(i > 0);
+							if(e2.attr('data-filtertext') && e2.is(':visible'))
+								i += i > 0 ? -1 : 1;
+							e = e2;
+						}
+						if(e && e.length)
+							ui.questions.active = e;
+					}
+					
+					else if(event.which == 39) // right arrow
+						$('a[data-q]', ui.questions.active).trigger('click');
+					else if(event.which == 37)
+						$('#popup-answer').popup('close');
+						
+					if($.inArray(event.which, [33,34,38,40]) != -1 && ui.questions.active && ui.questions.active.length)
+					{
+						$.mobile.silentScroll(ui.questions.active.position().top);
+						ui.questions.active.trigger('mouseover');
+					}
+				}
+			};
+			this.exam = {
+				active : null,
+				getQuestionSelection : function() {
+					// 40 Fragen sollen es sein
+					var q4cat = [];
+					var qnum = 40;
+					for(var c in app.questions.category)
+						q4cat.push({
+							v: qnum * app.questions.category[c].list.length / app.questions.questions.length,
+							c: c
+						});
+					
+					var selection = [];
+					while(selection.length < qnum)
+					{
+						q4cat.sort(function(a,b){ return b.v - a.v; });
+						// get q out of cat
+						var q;
+						do
+						{
+							var num = app.questions.category[q4cat[0].c].list.length;
+							var pick = Math.floor( Math.random() * ( num + 1 ) );
+							q = app.questions.category[q4cat[0].c].list[pick];
+						}
+						while(isNaN(q) || selection.indexOf(q) != -1);
+						selection.push(q);
+						q4cat[0].v -= 1;
+					}
+					
+					return selection;
+				},
+				loading : function(e,data) {
+					if($(data.prevPage).attr('id') == 'diag-exam-result') {
+						$.mobile.silentScroll(0);
+						return;
+					}
+					ui.exam.active = null;
+					$(window).off('keydown').on('keydown', ui.exam.keyboard);
+					$('#page-exam .content').html('<p>Prüfung wird vorbereitet. Einen Moment Geduld bitte..</p>');
+				},
+				create : function(e,data) {
+					if($(data.prevPage).attr('id') == 'diag-exam-result')
+						return;
+					
+					$('#page-exam').removeClass('reveal');
+					var html = '<div class="onreveal"><form><div class="ui-grid-b">';
+					html += '<div class="ui-block-a" style="padding-top:11px">';
+						html += 'Zeige Antworten:';
+					html += '</div>';
+					html += '<div class="ui-block-b">';
+						html += '<input data-mini="true" type="checkbox" id="exam-show-correct" />';
+						html += '<label for="exam-show-correct" class="correct">richtig</label>';
+					html += '</div>';
+					html += '<div class="ui-block-c">';
+						html += '<input data-mini="true" type="checkbox" id="exam-show-incorrect" checked="checked" />';
+						html += '<label for="exam-show-incorrect" class="incorrect">falsch</label>';
+					html += '</div></div></form><hr /></div>';
+					html += '<a id="q-exam-check" href="#popup-exam-result" data-rel="popup" data-position-to="window" data-role="button">prüfen</a>';
+					$('#page-exam .content').html(html).trigger('create');
+
+					$('#q-exam-check').on('click', ui.exam.showResult);
+
+					var questions = ui.exam.getQuestionSelection();
+					for(var i in questions)
+					{
+						$('#q-exam-check').before(
+							'<div id="exam_q_' + i + '" class="question">' 
+							+ ui.displayQuestion('exam', false, questions[i], {
+								prefixTitle : (parseInt(i)+1) + '/' + questions.length + ': ',
+								setPostfix : true
+							}) + '<hr /></div>'
+						);
+						(function(i){
+							ui.queue.add(function(){ $('#exam_q_' + i).trigger('create'); });
+						}(i));
+					}
+					
+					$('#exam-show-incorrect,#exam-show-correct').on('click', ui.exam.updateQuestionList);
+					ui.queue.run();
+				},
+				keyboard : function(event) {
+					if($.inArray(event.which, [37,38,39,40,49,50,51,65,66,67]) != -1 && (!ui.exam.active || !ui.exam.active.length))
+					{
+						ui.exam.active = $('#page-exam .question').first();
+						$.mobile.silentScroll(ui.exam.active.position().top);
+						ui.exam.active.css({backgroundColor:$.Color(255,255,0,192)}).animate({backgroundColor:'transparent'}, 1500);
+						return;
+					}
+					if($.inArray(event.which, [49,50,51,65,66,67]) != -1)
+					{
+						var k = event.which % 16 - 1;
+						if($('.answers input', ui.exam.active).length > k)
+							$('.answers input', ui.exam.active).eq(k).prop("checked", 
+								!$('.answers input', ui.exam.active).eq(k).is(':checked')
+							).checkboxradio("refresh");
+					}
+					else if($.inArray(event.which, [37,38,39,40]) != -1)
+					{
+						var e = event.which >= 39 ? ui.exam.active.next('.question') : ui.exam.active.prev('.question');
+						if(e.length)
+							ui.exam.active = e;
+						ui.exam.active.css({backgroundColor:$.Color(255,255,0,192)}).animate({backgroundColor:'transparent'}, 1500);
+						$.mobile.silentScroll(ui.exam.active.position().top);
+					}
+					else if(event.which == 32 && $('#q-exam-check').is(':visible'))
+						$('#q-exam-check').trigger('click');
+				},
+				check : function() {
+					$('#page-exam').addClass('reveal');
+					$('#q-exam-check').hide();
+					
+					var result = {};
+					var correct = 0;
+					$('#page-exam .question').each(function() {
+						var q_correct = 1;
+						$(this).find('input').each(function() {
+							q_correct &= $(this).is(':checked') == $(this).hasClass('correct');
+						});
+						$(this).addClass(q_correct ? 'correct' : 'incorrect');
+						$(this).find('.text').addClass(q_correct ? 'correct' : 'incorrect');
+						result[$(this).find('.answers').attr('data-qid')] = q_correct;
+					});
+					app.flashcard.setMultipleQuestionResult(result);
+					
+					return {
+						correct : $('#page-exam .question.correct').length,
+						insg : $('#page-exam .question').length
+					};
+				},
+				updateQuestionList : function() {
+					$('#page-exam .question.correct').toggle(
+						$('#exam-show-correct').is(':checked')
+					);
+					$('#page-exam .question.incorrect').toggle(
+						$('#exam-show-incorrect').is(':checked')
+					);
+				},
+				showResult : function() {
+					var result = ui.exam.check();
+					ui.exam.updateQuestionList();
+					
+					var res = '<p>Du hast ' + result.correct + ' von ' + result.insg + ' Fragen richtig beantwortet.</p>';
+					if(result.correct >= 32)
+						res += '<p class="correct">Damit hast du die Prüfung bestanden! Glückwunsch!</p>';
+					else
+						res += '<p class="incorrect">Damit hast du die Prüfung leider nicht bestanden!</p>';
+					res += '<a href="#" id="exam-popup-close" data-rel="back" data-role="button">OK</a>';
+					
+					app.statistic.setExamResult(result.correct >= 32);
+					$('#popup-exam-result .content').html(res).trigger('create');
+					
+					return true;
+				}
+			};
+			this.statistic = {
+				show : function() {
+					var s = app.statistic.getStatistic();
+					
+					var result = {"exam" : s.exam, "training" : s.training};
+					for(var i in result)
+					{
+						var res = result[i];
+						var p = $('#popup-statistic .' + i);
+						var rate = Math.round(100 * res.correct / res.total);
+						rate = isNaN(rate) ? '' : rate.toString(10);
+						$('.total', p).text(res.total);
+						$('.result-correct', p).text(res.correct);
+						$('.result-incorrect', p).text(res.total - res.correct);
+						$('.rate', p).text(rate + ' %');
+						$('.bar .correct', p).css('width', rate + '%');
+					}
+					
+					ui.statistic.showConfidence();
+				},
+				showConfidence : function () {
+					var c = app.flashcard.progress.confidence;
+					c.sort(function(a,b){return b-a;});
+
+					var w = c.length;
+					var h = 100;
+					var oldConf = -1;
+					var sumConf = 0;
+					var dx = 20;
+					var dy = 10;
+					var ex = 10;
+					var ey = 20;
+					var d1 = 2;
+					var d2 = 2;
+					var e = 10;
+					
+					var steps = [dx + ',' + (dy+h)];
+					for(var i = 0; i < c.length; sumConf+= c[i++])
+						if(oldConf != c[i])
+						{
+							if(i)
+								steps.push((dx+i) + ',' + (dy+h*(1-oldConf)));
+							steps.push((dx+i) + ',' + (dy+h*(1-c[i])));
+							oldConf = c[i];
+						}
+					steps.push((dx+i) + ',' + (dy+h*(1-oldConf)));
+					steps.push((dx+i) + ',' + (dy+h));
+					
+					var html = '<svg class="confidence" preserveAspectRatio="xMinYMin" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 '+(dx+ex+w)+' '+(dy+ey+h)+'">';
+					html += '<rect x="'+dx+'" y="'+dy+'" width="'+w+'" height="'+h+'" style="fill:rgb(255,0,0);" />';
+					html += '<polygon points="'+steps.join(' ')+'" style="fill:rgb(0,255,0);stroke:rgb(255,255,0);stroke-width:1" />';
+					html += '<polygon points="'+(dx)+','+(dy+h)+' '+(w+dx)+','+(dy+h)+' '+(w+dx)+','+(dy+h-d2)+' '+(w+dx+e)+','+(dy+h)+' '+(w+dx)+','+(dy+h+d1)+' '+(w+dx)+','+(dy+h)+'" style="fill:rgb(0,0,0);stroke:rgb(0,0,0);stroke-width:2" />';
+					html += '<polygon points="'+(dx)+','+(dy+h)+' '+(dx)+','+(dy)+' '+(dx+d2)+','+(dy)+' '+(dx)+','+(0)+' '+(dx-d1)+','+(dy)+' '+(dx)+','+(dy)+'" style="fill:rgb(0,0,0);stroke:rgb(0,0,0);stroke-width:2" />';
+					html += '<text x="70" y="122" fill="black" style="font-size:10px" transform="rotate(0 0,0)">Fragenkatalog</text>';
+					html += '<text x="-90" y="16" fill="black" style="font-size:10px" transform="rotate(-90 0,0)">Korrektheit</text>';
+					html += '</svg>'
+					
+					$('#popup-statistic .box').html(html);
+					$('#popup-statistic .percent').text(Math.round(100 * sumConf / c.length) + ' %');
+				}
+			},
+			this.settings = {
+				show : function() {
+					$('#set-box-size').val(app.flashcard.settings.boxSize).slider('refresh');
+					$('#set-expire-factor').val(100 * app.flashcard.settings.expireFactor).slider('refresh');
+					$('#set-randomizeQuestions').val(app.settings.randomizeQuestions ? 'on' : 'off').slider("refresh");
+				},
+				save : function() {
+					app.flashcard.setBoxSize(parseInt($('#set-box-size').val()));
+					app.flashcard.setExpireFactor(parseInt($('#set-expire-factor').val()) / 100);
+					app.settings.randomizeQuestions = $('#set-randomizeQuestions').val() == 'on';
+					app.settings.save();
+					return true;
+				},
+				reset : function() {
+					if(confirm('Sollen Einstellungen und Lernfortschritt wirklich gelöscht werden?'))
+					{
+						app.resetStorage();
+						return true;
+					}
+					return false;
+				}
+			}
+		}
+		
+		var app;
+		var ui;
+		try {
+			app = new THWTheorie();
+			ui = new THWTheorie_UIHelper(app);
+		} catch(e) {
+			alert(e.message);
+//			console.log(e.stack, e.message);
+			// @todo display startup errors
+		}
+		
+		$(document).ready(function(){
+			if (navigator.userAgent.match(/Android/i)) {
+				try{
+					window.scrollTo(0,0); // reset in case prev not scrolled  
+					var nPageH = $(document).height();
+					var nViewH = window.outerHeight;
+					if (nViewH > nPageH) {
+						nViewH -= 250;
+						$('BODY').css('height',nViewH + 'px');
+					}
+					window.scrollTo(0,1);
+				} catch(e) {}
+			}
+			
+			// Lernen
+			$("#page-ask,#page-show").on("pagebeforeshow", ui.learn.start);
+			$('#q-check').on('click', ui.learn.check);
+			$('#q-reveal').on('click', ui.learn.reveal);
+			$('#q-continue').on('click', ui.learn.show);
+			$('#q-not-known').on('click', ui.learn.markResult);
+			$('#q-known').on('click', ui.learn.markResult);
+			
+			// Nachschlagen
+			$('#page-questions').on("pagebeforeshow", ui.questions.printQuestionList);
+			$('#page-questions').on("pageshow", ui.questions.afterDisplay);
+			
+			// Prüfung
+			$('#page-exam').on('pagebeforeshow', ui.exam.create);
+//			$('#page-exam').on('pagebeforeshow', ui.exam.loading);
+//			$('#page-exam').on('pageshow', ui.exam.create);
+			$("#popup-exam-result").on( "popupafterclose", function(){ $.mobile.silentScroll(0); } );
+			
+			// Statistik
+			$('#m-popup-statistic').on('click', ui.statistic.show);
+			
+			// info
+			$('#lern-info-mehr').on('click', function(){
+				$('#diag-lern-info .detail').toggle();
+			});
+			
+			// Einstellungen
+			$('#page-settings').on('pagebeforeshow', ui.settings.show);
+			$('#set-save').on('click', ui.settings.save);
+			$('#set-reset').on('click', ui.settings.reset);
+
+		});
+	</script>
+	<style>
+		.reveal .incorrect { color: red; /* text-decoration: line-through; */}
+		.reveal .correct { color: green; /* text-decoration: underline; */}
+		.reveal label.incorrect { text-decoration: line-through; }
+		.reveal label.correct { text-decoration: underline; }
+		.reveal .onreveal { display:inline !important; }
+		.onreveal { display:none; }
+		#page-ask.ask #q-continue { display:none; }
+		#page-ask.reveal #q-check { display:none; }
+		#page-show.reveal #q-reveal { display:none; }
+		#page-show.ask .good { display:none; }
+		#page-exam h4 { margin-bottom:0px; }
+		.ui-field-contain .ui-controlgroup-controls { width:99%; }
+		.indented { padding-left: 1em; }
+		#popup-statistic p { margin-top: 0.5em; margin-bottom: 0.5em; }
+		#popup-statistic h4 { margin-top: 0.7em; margin-bottom: 0.7em; }
+		#popup-statistic .bar { height: 10px; background:red; width:100%; }
+		#popup-statistic .bar .correct { height: 10px; background:green; }
+		#popup-statistic .confidence { margin: 0px auto; width: 100%; height: 100%; }
+		#popup-statistic .cf { height: 1px; background:red; width:100%; }
+		#popup-statistic .box { text-align:center; }
+		#popup-statistic .cf div { height: 1px; background:green; }
+		label .ui-btn-inner { font-size:1.0em !important; max-height: 999999px; }
+		h4 { font-size:1.0em !important; max-height: 999999px; }
+		p { max-height: 999999px; }
+		#page-settings .field-randomizeQuestions .ui-slider-switch { width:99% }
+	</style>
+</head>
+<body>
+	<div id="page-main" data-role="page">
+		<div data-role="header">
+			<h1>THW Theorie</h1>
+			<a href="#page-settings" data-icon="gear" data-mini="true" class="ui-btn-right">Einstellungen</a>
+		</div>
+		<div data-role="content">
+			<a href="#page-ask" data-role="button">Lernen - Lösung eingeben</a>
+			<a href="#page-show" data-role="button">Lernen - Lösung bestätigen</a>
+			<hr />
+			<a class="delayed" href="#page-exam" data-role="button">Prüfung simulieren</a>
+			<hr />
+			<a href="#page-questions" data-role="button">Nachschlagen</a>
+			<a id="m-popup-statistic" href="#popup-statistic" data-rel="popup" data-role="button">Statistik</a>
+		</div>
+		<div id="popup-statistic" data-role="popup" class="reveal" data-overlay-theme="a">
+			<div data-role="header">
+				<h1 class="title">Lernstatistik</h1>
+			</div>
+			<div class="content" data-role="content">
+				<div class="training">
+					<h4>Lernen</h4>
+					<p>
+						Du hast beim Lernen insgesamt <span class="total"></span> Fragen beantwortet. <br />
+						Davon
+					</p>
+					<div class="indented">
+						<span class="correct"><span class="result-correct"></span> richtig</span> und <br />
+						<span class="incorrect"><span class="result-incorrect"></span> falsch</span>.
+					</div>
+					<p>
+						Das entspricht einer Quote von <span class="rate"></span>.
+					</p>
+					<div class="bar"><div class="correct"></div></div>
+				</div>
+				<hr />
+				<div class="exam">
+					<h4>Prüfung</h4>
+					<p>
+						Du hast <span class="total"></span> Prüfungsbögen beantwortet. <br />
+						Davon
+					</p>
+					<div class="indented">
+						<span class="correct"><span class="result-correct"></span> richtig</span> und <br />
+						<span class="incorrect"><span class="result-incorrect"></span> falsch</span>.
+					</div>
+					<p>
+						Das entspricht einer Quote von <span class="rate"></span>.
+					</p>
+					<div class="bar"><div class="correct"></div></div>
+				</div>
+				<hr />
+				<div class="flashcard">
+					<h4>Lernfortschritt: <span class="percent"></span></h4>
+					<div class="box">
+					</div>
+				</div>
+				<a href="#" data-rel="back" data-role="button">OK</a>
+			</div>
+		</div>	</div>
+	<div id="page-error" data-role="page" data-overlay-theme="e" data-close-btn="none">
+		<div data-role="header">
+			<h2>Fehler</h2>
+		</div>
+		<div data-role="content">
+			<p class="message"></p>
+			<p class="consequence">Die Nutzung der Seite kann leider nicht fortgesetzt werden</p>
+		</div>
+	</div>
+	<div id="page-ask" class="page-question" data-role="page">
+		<div data-role="header">
+	 		<a href="#page-main" data-icon="arrow-l">Zurück</a>
+			<h1 class="title"></h1>
+			<a href="#diag-lern-info" data-icon="info" data-mini="true" class="ui-btn-right">Info</a>
+		</div>
+		<div class="content" data-role="content">
+			<div class="question"></div>
+			<a id="q-check" href="#" data-role="button">prüfen</a>
+			<a id="q-continue" href="#" data-role="button">weiter</a>
+		</div>
+	</div>
+	<div id="page-show" class="page-question" data-role="page">
+		<div data-role="header">
+	 		<a href="#page-main" data-icon="arrow-l">Zurück</a>
+			<h1 class="title"></h1>
+			<a href="#diag-lern-info" data-icon="info" data-mini="true" class="ui-btn-right">Info</a>
+		</div>
+		<div class="content" data-role="content">
+			<div class="question"></div>
+			<a id="q-reveal" href="#" data-role="button">Antworten zeigen</a>
+			<div class="ui-grid-a good">
+				<div class="ui-block-a"><a id="q-not-known" class="incorrect" href="#" data-role="button">nicht gewusst</a></div>
+				<div class="ui-block-b"><a id="q-known" class="correct" href="#" data-role="button">gewusst</a></div>     
+			</div>
+		</div>
+	</div>
+	<div id="page-questions" data-role="page">
+		<div data-role="header">
+	 		<a href="#page-main" data-icon="arrow-l">Zurück</a>
+			<h1 class="title">Fragenkatalog</h1>
+		</div>
+		<div class="content" data-role="content">
+			<ul data-role="listview" data-filter="true" data-inset="true" data-filter-placeholder="Suchbegriff">
+			</ul>
+			<div id="popup-answer" data-role="popup" data-overlay-theme="a">
+				<div data-role="header">
+					<h1 class="title"></h1>
+				</div>
+				<div class="content reveal" data-role="content">
+					<div class="question"></div>
+					<a href="#" data-rel="back" data-role="button">OK</a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div id="page-exam" data-role="page">
+		<div data-role="header">
+	 		<a href="#page-main" data-icon="arrow-l">Zurück</a>
+			<h1 class="title">Prüfung</h1>
+		</div>
+		<div class="content" data-role="content">
+		</div>
+		<div id="popup-exam-result" data-role="popup" class="reveal" data-overlay-theme="a">
+			<div data-role="header">
+				<h1 class="title">Prüfungsresultat</h1>
+			</div>
+			<div class="content" data-role="content">
+			</div>
+		</div>
+	</div>
+	<div id="diag-lern-info" data-role="page" class="reveal">
+		<div data-role="header">
+	 		<a href="#"  data-rel="back" data-icon="arrow-l">Zurück</a>
+			<h1 class="title">Information zum Lernmodus</h1>
+		</div>
+		<div class="content" data-role="content">
+			<p>Diese App berücksichtigt deinen Lernfortschritt bei jeder Frage um die Abfragereihenfolge festzulegen. Hierdurch werden Fragen, bei denen du oft falsch liegst häufiger wiederholt als Fragen die du immer richtig beantwortest. So "nerven" die einfachen Fragen nicht und du konzentrierst dich auf deine Schwachpunkte.</p>
+			<hr />
+			<a class="detail" id="lern-info-mehr" data-role="button">mehr Infos</a>
+			<div class="detail" style="display:none">
+				<p>Das System unterteilt den Fragenkatalog in zwei Bereiche, die Abfrage-Box und die Sammel-Box. Die Abfrage-Box hat eine feste Größe von <span class="info-boxSize"></span> Fragen und wird immer von hinten aufgefüllt. Die Sammel-Box enthält die restlichen Fragen und ist entsprechend deines Lernfortschritts bei jeder Frage sortiert.</p> 
+				<p>Abgefragt wird immer die vorderste Karte der Abfrage-Box. Beantwortest du die Frage falsch, kommt sie ans Ende der Box, wird also genau nach <span class="info-boxSize"></span> Fragen wiederholt. Ist die Antwort richtig kommt die Frage in die Sammel-Box, einsortiert je nach deinem Lernfortschritt im Vergleich zu den anderen Fragen. Die fehlende Stelle in der Abfrage-Box wird mit der ersten Frage aus der Sammel-Box, also der wahrscheinlich schwierigsten Frage aus dieser Box, aufgefüllt.</p>
+				<p>Je öfter du eine Frage richtig beantwortest, je weiter hinten wird sie einsortiert und damit seltner abgefragt.</p>
+				<p>Das Verfahren ist natürlich vom <a href="http://de.wikipedia.org/wiki/Lernkartei">Lernkartei-System</a> inspiriert.</p>
+			
+				<p>Um abzuschätzen wie sicher du bei einer Frage bist, wird eine Methode namens <a href="http://de.wikipedia.org/wiki/Exponentielle_Gl%C3%A4ttung">exponentielle Glättung</a> verwendet. Das funktioniert folgendermaßen:</p>
+				<p>Wenn du eine Frage noch nicht beantwortet hast, nimmt das Programm an, dass du die Antwort nicht weißt, also initial 0% Lernfortschritt hast. Beantwortest du die Frage richtig, wird dein aktueller Lernstand (100% für richtig) anteilig mit dem alten Lernfortschritt zum neuen Lernfortschritt zusammengesetzt.</p>  
+				<p>Den Anteil kannst du einstellen, er liegt aktuell bei <span class="info-expire"></span> des alten Lernstands.</p> 
+			</div>
+			<a href="#" data-rel="back" data-role="button">OK</a>
+		</div>
+	</div>
+	<div id="page-settings" data-role="page">
+		<div data-role="header">
+	 		<a href="#page-main" data-icon="arrow-l">Zurück</a>
+			<h1 class="title">Einstellungen</h1>
+		</div>
+		<div class="content" data-role="content">
+			<h1>Einstellungen für den Lernfortschritt</h1>
+			<form>
+				<div class="ui-grid-a">
+					<div class="ui-block-a">
+						<label for="set-box-size">Größe der Abfrage-Box:</label>
+					</div>
+					<div class="ui-block-b">
+						<input type="range" id="set-box-size" data-highlight="true" min="10" max="50" value="" />
+					</div>	   
+				</div>
+				<div class="ui-grid-a">
+					<div class="ui-block-a">
+						<label for="set-expire-factor">Wichtung alte vs. aktuelle Antwort (in Prozent):</label>
+					</div>
+					<div class="ui-block-b">
+						<input type="range" id="set-expire-factor" data-highlight="true" min="10" max="70" value="" />
+					</div>	   
+				</div>
+				<div class="ui-grid-a">
+					<div class="ui-block-a">
+						<label for="set-randomizeQuestions">Antwortmöglichkeiten mischen:</label>
+					</div>
+					<div class="ui-block-b field-randomizeQuestions">
+						<select name="randomizeQuestions" id="set-randomizeQuestions" data-role="slider">
+							<option value="on">Mischen</option>
+							<option value="off">Nicht mischen</option>
+						</select>
+					</div>	   
+				</div>
+			</form>
+			<a id="set-save" href="#" data-rel="back" data-role="button">speichern</a>
+			<br /><br /><br /><br /><br /><br />
+			<hr />
+			<br />
+			<a id="set-reset" href="#" data-rel="back" data-role="button">Einstellungen und Lernfortschritt zurücksetzen</a>
+		</div>
+	</div>
+</body>
+</html>
