@@ -248,6 +248,11 @@
 					this.owner.statistic.setTrainingResult(q2result[q]);
 				}
 				
+				// every ten questions: reduce global confidence to 99%
+				if(this.owner.statistic.data.training.total % 10 == 0)
+					for(var i in this.progress.confidence)
+						this.progress.confidence[i] *= 0.99
+				
 				var fullSortOfOtherNeeded = false;
 				var boxCorrect = [];
 				var boxIncorrect = [];
@@ -727,9 +732,13 @@
 					ui.statistic.showConfidence();
 				},
 				showConfidence : function () {
-					var c = app.flashcard.progress.confidence;
+					var c = app.flashcard.progress.confidence.slice();
 					c.sort(function(a,b){return b-a;});
-
+					
+					// empiric derived compensation for aging
+					for(var i = 0; i < c.length; i++)
+						c[i] /= 0.83 * Math.pow(0.99, i/10);
+					
 					var w = c.length;
 					var h = 100;
 					var oldConf = -1;
