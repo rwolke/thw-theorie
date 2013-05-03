@@ -588,16 +588,8 @@
 					
 					return selection;
 				},
-				loading : function(e,data) {
-					if($(data.prevPage).attr('id') == 'diag-exam-result') {
-						$.mobile.silentScroll(0);
-						return;
-					}
-					ui.exam.active = null;
-					$(window).off('keydown').on('keydown', ui.exam.keyboard);
-					$('#page-exam .content').html('<p>Prüfung wird vorbereitet. Einen Moment Geduld bitte..</p>');
-				},
 				create : function(e,data) {
+					ui.exam.active = null;
 					if($(data.prevPage).attr('id') == 'diag-exam-result')
 						return;
 					
@@ -616,9 +608,9 @@
 					html += '</div></div></form><hr /></div>';
 					html += '<a id="q-exam-check" href="#popup-exam-result" data-rel="popup" data-position-to="window" data-role="button">prüfen</a>';
 					$('#page-exam .content').html(html).trigger('create');
-
+					
 					$('#q-exam-check').on('click', ui.exam.showResult);
-
+					
 					var questions = ui.exam.getQuestionSelection();
 					for(var i in questions)
 					{
@@ -635,6 +627,7 @@
 					}
 					
 					$('#exam-show-incorrect,#exam-show-correct').on('click', ui.exam.updateQuestionList);
+					$(window).off('keydown').on('keydown', ui.exam.keyboard);
 					ui.queue.run();
 				},
 				keyboard : function(event) {
@@ -840,8 +833,6 @@
 			
 			// Prüfung
 			$('#page-exam').on('pagebeforeshow', ui.exam.create);
-//			$('#page-exam').on('pagebeforeshow', ui.exam.loading);
-//			$('#page-exam').on('pageshow', ui.exam.create);
 			$("#popup-exam-result").on( "popupafterclose", function(){ $.mobile.silentScroll(0); } );
 			
 			// Statistik
