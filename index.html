@@ -256,14 +256,13 @@
 						+ (1 - this.settings.expireFactor) * (q2result[q] ? 1 : 0);
 					
 					this.owner.statistic.setTrainingResult(q2result[q]);
+					
+					// every ten questions: reduce global confidence to 99%
+					if(this.owner.statistic.data.training.total % 10 == 0)
+						for(var i in this.progress.confidence)
+							this.progress.confidence[i] *= 0.99
 				}
 				
-				// every ten questions: reduce global confidence to 99%
-				if(this.owner.statistic.data.training.total % 10 == 0)
-					for(var i in this.progress.confidence)
-						this.progress.confidence[i] *= 0.99
-				
-				var fullSortOfOtherNeeded = false;
 				var boxCorrect = [];
 				var boxIncorrect = [];
 				// get all questions of box that were answered 
@@ -276,40 +275,24 @@
 							boxIncorrect.push(parseInt(q));
 						this.progress.box.splice(this.progress.box.indexOf(parseInt(q)), 1);
 					}
-					else
-						fullSortOfOtherNeeded = true;
 				
 				// empty box even more if necessary (needed in case of size change of box)
 				while(this.progress.box.length > this.settings.boxSize)
 					boxIncorrect.push(this.progress.box.pop());
 				
+				// fill box with incorrect
 				while(this.progress.box.length < this.settings.boxSize && boxIncorrect.length)
 					this.progress.box.push(boxIncorrect.shift());
 				
+				// get all left => put in other
 				var leftOver = boxIncorrect.concat(boxCorrect);
-				if(fullSortOfOtherNeeded)
-				{
-					while(leftOver.length) 
-						this.progress.other.push(leftOver.shift());
-					
-					this.progress.other.sort(function(a,b){ 
-						return app.flashcard.progress.confidence[a] - app.flashcard.progress.confidence[b]; 
-					});
-				}
-				else
-					for(var j in leftOver)
-					{
-						var q = leftOver[j];
-						var c = this.progress.confidence[q];
-						var ins = this.progress.other.length;
-						for(var i = 0; i < this.progress.other.length; i++)
-							if(c < this.progress.confidence[this.progress.other[i]])
-							{
-								ins = i;
-								break;
-							}
-						this.progress.other.splice(ins, 0, q);
-					}
+				while(leftOver.length) 
+					this.progress.other.push(leftOver.shift());
+				
+				// order
+				this.progress.other.sort(function(a,b){ 
+					return app.flashcard.progress.confidence[a] - app.flashcard.progress.confidence[b]; 
+				});
 				
 				// fill rest of box
 				while(this.progress.box.length < this.settings.boxSize)
