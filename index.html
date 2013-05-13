@@ -17,6 +17,7 @@
 	<script>
 		$(document).bind( "mobileinit", function(){
 			$.mobile.page.prototype.options.theme = 'a';
+			$.mobile.buttonMarkup.hoverDelay = 50;
 		});
 	</script>
 	<script src="js/jquery.mobile-1.3.1.min.js"></script>
@@ -877,6 +878,8 @@
 			<hr />
 			<a href="#page-questions" data-role="button">Nachschlagen</a>
 			<a id="m-popup-statistic" href="#popup-statistic" data-rel="popup" data-role="button">Statistik</a>
+			<hr />
+			<a href="#page-impressum" data-role="button">Infos zur App</a>
 		</div>
 		<div id="popup-statistic" data-role="popup" class="reveal" data-overlay-theme="a">
 			<div data-role="header">
@@ -1069,6 +1072,68 @@
 			<hr />
 			<br />
 			<a id="set-reset" href="#" data-rel="back" data-role="button">Einstellungen und Lernfortschritt zurücksetzen</a>
+		</div>
+	</div>
+	<div id="page-impressum" data-role="page">
+		<div data-role="header">
+	 		<a href="#page-main" data-icon="arrow-l">Zurück</a>
+			<h1 class="title">Infos zur App</h1>
+		</div>
+		<div class="content" data-role="content">
+			<h1>WebApp</h1>
+			<p>
+				Diese WebApp auf Basis von JQuery und JQuery Mobile ermöglicht eine effektive Vorbereitung 
+				auf die <a href="http://www.thw.de/">THW</a> Theorieprüfung. Der komplette Fragenkatalog wird 
+				abgefragt, wobei Fragen die besonders oft falsch beantwortet wurden, häufiger wiederholt werden. 
+			</p>
+			<p>
+				Die Anwendung kann in allen modernen Browsern, ob mobil oder am PC, offline verwendet werden. Am
+				Besten ein Lesezeichen auf die Startseite setzen und dieses dann immer aufrufen. Der Lernfortschritt 
+				bleibt über mehrere Sitzungen erhalten.
+			</p>
+			
+			<h2>Besonderer Dank</h2>
+			<p>
+				Mein Dank gilt <a href="http://thw-theorie.de/">Kai Blaschke</a> der den Fragenkatalog in einer <a href="https://github.com/rwolke/thw-theorie/blob/master/_helper/dl.php">maschinenlesbaren Form</a> auf seiner Seite <a href="http://thw-theorie.de/">thw-theorie.de</a> integriert und kostenlos zur freien Verfügung gestellt hat.
+			</p>
+			
+			<hr />
+			<h1>Juristische Erklärungen</h1>
+			<p>
+				Diese Seite bzw. Web-Anwendung ist ein privates Projekt. Sie steht in keiner direkten Verbindung zur Bundesanstalt Technisches Hilfswerk.
+			</p>
+			<h2>Lizenz</h2>
+			<p>
+				<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/de/"><img alt="Creative Commons Lizenzvertrag" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-sa/3.0/de/88x31.png" /></a><br /><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title">THW Theorie WebApp</span> von <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">Robert Wolke</span> steht unter einer <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/de/">Creative Commons Namensnennung - Nicht-kommerziell - Weitergabe unter gleichen Bedingungen 3.0 Deutschland Lizenz</a>.
+			</p>
+			<p>
+				Auf Grundlage dieser Lizenz kann die WebApp gerne weiterentwickelt und auch selbst gehostet werden. Verbesserungsvorschläge und Pull Requests können über GitHub gerne eingereicht werden. 
+			</p>
+			
+			<h2>Marke THW</h2>
+			<p>
+				Der Zahnkranz, der im Icon der Seite verwendet wird, ist eine eingetragene Wort-Bildmarke der Bundesanstalt Technisches Hilfswerk. Sie wird hier dekorativ zum Verweis auf die Bundesanstalt verwendet. 
+			</p>
+			
+			<h2>Haftungsausschluss</h2>
+			<p>
+				Diese WebApp dient als Hilfsmittel zur Vorbereitung für die THW-Grundausbildung. Trotz sorgfältiger Prüfung und Tests übernehme ich keine Haftung für die Korrektheit und Vollständigkeit der Fragen, Antwortmöglichkeiten und Angaben zur richtigen Antwort. Die Verwendung erfolgt somit auf eigene Gefahr. 
+			</p>
+			
+			<h2>Impressum</h2>
+			<p>
+				Diese Seite verfügt über kein Impressum nach deutschem Recht:<br />
+				Ein Impressum gemäß § 5 TMG ist nicht erforderlich, da es sich nicht um einen geschäftsmäßigen Dienst, 
+				sondern eine private Seite handelt. Ebenso werden keine journalistisch-redaktionelle Inhalte veröffentlich, 
+				sodass ein Impressum nach § 55 RstV ebenfalls nicht erforderlich ist.<br />
+				Für Fragen und Hinweise bin ich jedoch über <a href="mailto:r.wolke+app@thw-rostock.de">r.wolke+app@thw-rostock.de</a> zu erreichen.
+			</p>
+			<h2>Datenschutz</h2>
+			<p>
+				Die WebApp wird z.Zt. von GitHub unter <a href="http://rwolke.github.io/thw-theorie/">http://rwolke.github.io/thw-theorie/</a> gehostet. Ein Zugriff auf die Seiten könnte deshalb von GitHub protokolliert und die von Ihnen übermittelten Daten gespeichert werden. Hierauf habe ich (Robert Wolke) als Inhalteanbieter (die WebApp) keinen Einfluss und Zugriff. Für Fragen dazu lesen Sie bitte die Datenschutzbestimmungen von GitHub.<br />
+				<br />
+				Die bei der Nutzung der WebApp anfallenden Daten (der Lernfortschritt) wird ausschließlich in Ihrem Browser gespeichert und nicht nach extern übermittelt.
+			</p>
 		</div>
 	</div>
 </body>
