@@ -27,6 +27,7 @@
 		window.addEventListener('offline', function(){});
 		try{
 			window.applicationCache.addEventListener('updateready', function(){
+				$('#popup-update').popup();
 				$('#popup-update').popup("open");
 			}, false);
 		}catch(e){}
@@ -425,7 +426,8 @@
 					$('#page-show').removeClass('ask').addClass('reveal');
 				},
 				markResult : function(event) {
-					var id = $(event.target).parents('a').attr('id');
+					var e = $(event.target).prop("tagName") == 'a' ? $(event.target) : $(event.target).parents('a');
+					var id = e.attr('id');
 					var correct = id == 'q-known';
 					
 					app.flashcard.setFirstQuestionResult(correct);
@@ -1092,6 +1094,23 @@
 				bleibt über mehrere Sitzungen erhalten.
 			</p>
 			
+			<h2>Bedienung</h2>
+			<p>
+				Neben der offensichtlichen Steuerung der App per Maus und Touch, werden auch Tastatureingaben unterstützt. 
+			</p>
+			<h3>Lernen - Lösungen eingeben</h3>
+			<p>
+				In Lernmodus können über die Tasten <b>1</b>, <b>2</b> und <b>3</b>, bzw. <b>a</b>, <b>b</b> und <b>c</b>, die Häkchen bei den Fragen gesetzt werden. Zur Auswertung und nächsten Frage geht es mittels <b>Leertaste</b> oder der Cursor-Taste <b>&rarr;</b>.
+			</p>
+			<h3>Lernen - Lösungen bestätigen</h3>
+			<p>
+				In diesem Modus geht es mittels <b>Leertaste</b> zur Lösung und das Resultat kann mittels der Cursor-Taste <b>&larr;</b> oder <b>&rarr;</b> ausgewählt werden.
+			</p>
+			<h3>Prüfungsmodus</h3>
+			<p>
+				Über die Cursortasten <b>&uarr;</b> und <b>&darr;</b> kann zwischen den Fragen umgeschaltet werden, und mittels <b>1</b>, <b>2</b> und <b>3</b>, bzw. <b>a</b>, <b>b</b> und <b>c</b> die Antwort eingegeben werden.
+			</p>
+			
 			<h2>Besonderer Dank</h2>
 			<p>
 				Mein Dank gilt <a href="http://thw-theorie.de/">Kai Blaschke</a> der den Fragenkatalog in einer <a href="https://github.com/rwolke/thw-theorie/blob/master/_helper/dl.php">maschinenlesbaren Form</a> auf seiner Seite <a href="http://thw-theorie.de/">thw-theorie.de</a> integriert und kostenlos zur freien Verfügung gestellt hat.
@@ -1107,12 +1126,12 @@
 				<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/de/"><img alt="Creative Commons Lizenzvertrag" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-sa/3.0/de/88x31.png" /></a><br /><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title">THW Theorie WebApp</span> von <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">Robert Wolke</span> steht unter einer <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/de/">Creative Commons Namensnennung - Nicht-kommerziell - Weitergabe unter gleichen Bedingungen 3.0 Deutschland Lizenz</a>.
 			</p>
 			<p>
-				Auf Grundlage dieser Lizenz kann die WebApp gerne weiterentwickelt und auch selbst gehostet werden. Verbesserungsvorschläge und Pull Requests können über GitHub gerne eingereicht werden. 
+				Auf Grundlage dieser Lizenz kann die WebApp gerne weiterentwickelt und auch selbst gehostet werden. Verbesserungsvorschläge und Pull Requests können gerne über GitHub eingereicht werden. 
 			</p>
 			
 			<h2>Marke THW</h2>
 			<p>
-				Der Zahnkranz, der im Icon der Seite verwendet wird, ist eine eingetragene Wort-Bildmarke der Bundesanstalt Technisches Hilfswerk. Sie wird hier dekorativ zum Verweis auf die Bundesanstalt verwendet. 
+				Der Zahnkranz, der im Icon der Seite verwendet wird, ist eine eingetragene Wort-Bildmarke der Bundesanstalt Technisches Hilfswerk. Sie wird hier nur dekorativ zum Verweis auf die Bundesanstalt verwendet. 
 			</p>
 			
 			<h2>Haftungsausschluss</h2>
@@ -1126,13 +1145,13 @@
 				Ein Impressum gemäß § 5 TMG ist nicht erforderlich, da es sich nicht um einen geschäftsmäßigen Dienst, 
 				sondern eine private Seite handelt. Ebenso werden keine journalistisch-redaktionelle Inhalte veröffentlich, 
 				sodass ein Impressum nach § 55 RstV ebenfalls nicht erforderlich ist.<br />
-				Für Fragen und Hinweise bin ich jedoch über <a href="mailto:r.wolke+app@thw-rostock.de">r.wolke+app@thw-rostock.de</a> zu erreichen.
+				Für Fragen und Hinweise bin ich über <a href="mailto:r.wolke+app@thw-rostock.de">r.wolke+app@thw-rostock.de</a> zu erreichen.
 			</p>
 			<h2>Datenschutz</h2>
 			<p>
-				Die WebApp wird z.Zt. von GitHub unter <a href="http://rwolke.github.io/thw-theorie/">http://rwolke.github.io/thw-theorie/</a> gehostet. Ein Zugriff auf die Seiten könnte deshalb von GitHub protokolliert und die von Ihnen übermittelten Daten gespeichert werden. Hierauf habe ich (Robert Wolke) als Inhalteanbieter (die WebApp) keinen Einfluss und Zugriff. Für Fragen dazu lesen Sie bitte die Datenschutzbestimmungen von GitHub.<br />
+				Die WebApp wird z.Zt. von GitHub unter <a href="http://rwolke.github.io/thw-theorie/">http://rwolke.github.io/thw-theorie/</a> gehostet. Ein Zugriff auf die Seiten könnte deshalb von GitHub protokolliert und die von Ihnen übermittelten Daten gespeichert werden. Hierauf habe ich (Robert Wolke) als Inhalteanbieter keinen Einfluss und Zugriff. Für Fragen dazu lesen Sie bitte die Datenschutzbestimmungen von GitHub.<br />
 				<br />
-				Die bei der Nutzung der WebApp anfallenden Daten (der Lernfortschritt) wird ausschließlich in Ihrem Browser gespeichert und nicht nach extern übermittelt.
+				Die bei der Nutzung der WebApp anfallenden Daten (z.B. der Lernfortschritt oder die Einstellungen) werden ausschließlich in Ihrem Browser gespeichert und von dieser WebApp nicht nach extern übermittelt.
 			</p>
 		</div>
 	</div>
