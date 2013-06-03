@@ -41,16 +41,12 @@
 				localStorage : false,
 				applicationCache : false
 			};
-			this.currentVersion = {
-				// version necessary to trigger update for stored data
-				app : 0.1,
-				questions : 1
-			};
+			this.questionSets = {
+				"2006" : {name: "Stand 2006", file:"questions_2006v1.json"},
+				"2013" : {name: "Stand 2013", file:"questions_2013v1.json"}
+			}
 			this.defaultSettings = {
-				savedVersion : {
-					app : 0,
-					questions : 0
-				},
+				selectedQuestionSet: "2013",
 				randomizeQuestions : false
 //				showIntro : true,
 //				showChangelog : true,
@@ -89,11 +85,30 @@
 				this.statistic = new THWTheorie_Statistic(this, true);
 				this.flashcard = new THWTheorie_Flashcard(this, true);
 			}
-			this.upgradeQuestionCatalog = function() {
-				this.settings.savedVersion.questions = this.currentVersion.questions;
+			this.loadQuestionCatalog = function(upgrade) {
+				// load questions
+				var that = this;
+				$.ajax({
+					async: false,
+					url: this.questionSets[this.settings.selectedQuestionSet].file,
+					dataType: "json",
+					success: function(data) {
+						that.questions = data;
+						for(var qid in that.questions.questions)
+							if(!that.questions.category[that.questions.questions[qid].category].list)
+								that.questions.category[that.questions.questions[qid].category].list = [qid];
+							else
+								that.questions.category[that.questions.questions[qid].category].list.push(qid);
+					},
+					error: function() {
+						throw new Error('Fragenkatalog konnte nicht geladen werden!');
+					}
+				});
 				
-				this.statistic = new THWTheorie_Statistic(this, true);
-				this.flashcard = new THWTheorie_Flashcard(this, true);
+				if(upgrade) {
+					this.statistic = new THWTheorie_Statistic(this, true);
+					this.flashcard = new THWTheorie_Flashcard(this, true);
+				}
 			}
 			
 			/*
@@ -114,44 +129,10 @@
 			
 			// load settings
 			this.settings = this.initStorage('settings', this.defaultSettings);
+			this.loadQuestionCatalog();
 			
-			// perform update of app if necessary
-			if(this.settings.savedVersion.app < this.currentVersion.app)
-			{
-				// first run of app
-				if(this.settings.savedVersion.app == 0)
-					this.settings.savedVersion = this.currentVersion;
-				else // upgrade from some previous version
-				{}
-			}
-			
-			// handle new question catalog
-			var performReset = false;
-			if(
-				this.settings.savedVersion.questions < this.currentVersion.questions && 
-				confirm('Es gibt eine neue Version der Theorie-Fragen. Soll diese aktualisiert werden? (Der Lernfortschritt wird dabei zurückgesetzt.)')
-			)
-			{
-				this.settings.savedVersion.questions = this.currentVersion.questions;
-				performReset = true;
-			}
-			
-			// load questions
-			var that = this;
-			$.ajax({
-				async: false,
-				url: "questions_v" + this.settings.savedVersion.questions + ".json",
-				dataType: "json",
-				success: function(data) {
-					that.questions = data;
-				},
-				error: function() {
-					throw new Error('Fragenkatalog konnte nicht geladen werden!');
-				}
-			});
-			
-			this.statistic = new THWTheorie_Statistic(this, performReset);
-			this.flashcard = new THWTheorie_Flashcard(this, performReset);
+			this.statistic = new THWTheorie_Statistic(this, false);
+			this.flashcard = new THWTheorie_Flashcard(this, false);
 		}
 		
 		function THWTheorie_Statistic(owner, reset) {
@@ -426,7 +407,7 @@
 					$('#page-show').removeClass('ask').addClass('reveal');
 				},
 				markResult : function(event) {
-					var e = $(event.target).prop("tagName") == 'a' ? $(event.target) : $(event.target).parents('a');
+					var e = $(event.target).prop("tagName").toLowerCase() == 'a' ? $(event.target) : $(event.target).parents('a');
 					var id = e.attr('id');
 					var correct = id == 'q-known';
 					
@@ -767,6 +748,12 @@
 			},
 			this.settings = {
 				show : function() {
+					var options = $("#set-question-set");
+					options.children().remove();
+					$.each(app.questionSets, function(i) {
+					    options.append($("<option />").val(i).text(this.name));
+					});
+					options.val(app.settings.selectedQuestionSet).selectmenu('refresh');
 					$('#set-box-size').val(app.flashcard.settings.boxSize).slider('refresh');
 					$('#set-expire-factor').val(100 * app.flashcard.settings.expireFactor).slider('refresh');
 					$('#set-randomizeQuestions').val(app.settings.randomizeQuestions ? 'on' : 'off').slider("refresh");
@@ -775,6 +762,12 @@
 					app.flashcard.setBoxSize(parseInt($('#set-box-size').val()));
 					app.flashcard.setExpireFactor(parseInt($('#set-expire-factor').val()) / 100);
 					app.settings.randomizeQuestions = $('#set-randomizeQuestions').val() == 'on';
+					qsChanged = $('#set-randomizeQuestions').val() != app.settings.selectedQuestionSet;
+					if(qsChanged && confirm('Bei einem Wechsel des Fragenkatalogs wird der Lernfortschritt gelöscht! Fortfahren?'))
+					{
+						app.settings.selectedQuestionSet = $('#set-question-set').val();
+						app.loadQuestionCatalog(true);
+					}
 					app.settings.save();
 					return true;
 				},
@@ -1039,8 +1032,22 @@
 			<h1 class="title">Einstellungen</h1>
 		</div>
 		<div class="content" data-role="content">
-			<h1>Einstellungen für den Lernfortschritt</h1>
+			<h1>Einstellungen</h1>
 			<form>
+				<h2>Fragenkatalog</h2>
+				<div class="ui-grid-a">
+					<div class="ui-block-a">
+						<label for="set-question-set">Welcher Fragenkatalog?</label>
+					</div>
+					<div class="ui-block-b">
+						<select name="questionSet" id="set-question-set">
+							<option value="2006">2006</option>
+							<option value="2013">2013</option>
+						</select>
+					</div>	   
+				</div>
+				
+				<h2>Lernfortschritt</h2>
 				<div class="ui-grid-a">
 					<div class="ui-block-a">
 						<label for="set-box-size">Größe der Abfrage-Box:</label>
@@ -1070,7 +1077,6 @@
 				</div>
 			</form>
 			<a id="set-save" href="#" data-rel="back" data-role="button">speichern</a>
-			<br /><br /><br /><br /><br /><br />
 			<hr />
 			<br />
 			<a id="set-reset" href="#" data-rel="back" data-role="button">Einstellungen und Lernfortschritt zurücksetzen</a>
