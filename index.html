@@ -1061,13 +1061,16 @@
 					
 					$.when(
 						$.getScript("js/jspdf.js"),
-						$.getScript("js/jspdf.plugin.standard_fonts_metrics.js"),
-						$.getScript("js/jspdf.plugin.split_text_to_size.js"),
-						$.getScript("js/jspdf.plugin.total_pages.js"),
 						$.getScript("js/FileSaver.js/FileSaver.js"),
 						$.getScript("js/Blob.js/BlobBuilder.js")
 					).done(function(){
-						$('#pdf-select-questions').removeClass('ui-disabled');
+						$.when(
+							$.getScript("js/jspdf.plugin.standard_fonts_metrics.js"),
+							$.getScript("js/jspdf.plugin.split_text_to_size.js"),
+							$.getScript("js/jspdf.plugin.total_pages.js"),
+						).done(function(){
+							$('#pdf-select-questions').removeClass('ui-disabled');
+						});
 					});
 				},
 				select : function() {

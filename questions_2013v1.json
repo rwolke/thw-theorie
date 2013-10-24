@@ -1081,7 +1081,7 @@
 	}, {
 		"category": 5,
 		"number": 10,
-		"question": "Mit welchem Betriebsstoff wird der Motor des Stromerzeugers betrieben (2-Takt-Ottomoter)?",
+		"question": "Mit welchem Betriebsstoff wird der Motor des Stromerzeugers betrieben (2-Takt-Ottomotor)?",
 		"answers": {
 			"1": "Kraftstoff\/\u00d6l-Gemisch",
 			"2": "Diesel",
