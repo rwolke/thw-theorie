@@ -5,6 +5,8 @@ Diese WebApp auf Basis von JQuery und JQuery Mobile ermöglicht eine effektive V
 
 Die Anwendung kann in allen modernen Browsern, ob mobil oder am PC, offline verwendet werden. Am Besten ein Lesezeichen auf die Startseite setzen und dieses dann immer aufrufen. Der Lernfortschritt bleibt über mehrere Sitzungen erhalten. 
 
+Zusätzlich verfügt das Programm über einen [PDF-Generator][4] mit dem Abfrage-Bögen erstellt werden können.
+
 ## Besonderer Dank
 
 Mein Dank gilt [Kai Blaschke][2] der den Fragenkatalog in einer [maschinenlesbaren Form][3] auf seiner Seite [thw-theorie.de][2] integriert und kostenlos zur freien Verfügung gestellt hat.
@@ -23,3 +25,4 @@ Diese WebApp dient als Hilfsmittel zur Vorbereitung für die THW-Grundausbildung
  [1]: http://www.thw.de/
  [2]: http://thw-theorie.de/
  [3]: https://github.com/rwolke/thw-theorie/blob/master/_helper/dl.php
+ [4]: https://github.com/MrRio/jsPDF

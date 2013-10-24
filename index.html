@@ -307,6 +307,201 @@
 				this.progress.save();
 			}
 		}
+		function THWTheorie_PDF(config) {
+			this.layout = {
+				border : {top : 20, bottom : 20 },
+				font : {fontSize: 12, fontStyle: 'normal', fontName: 'times'},
+				fontHeight : false,
+				lineSepFactor : 0.15,
+				paragraphSepFactor : 0.5,
+				columns : {
+					nr : { x : 22.5 },
+					question : { x : 37.5, width: 65 },
+					answers : { x : 107.5, width: 65},
+					abc : { x : 178.5},
+					solution : { x : 188.5 }
+				},
+				lines : {
+					box : [
+						{ x1 :  20, y1 : 0, x2: 195, y2 : 0, thickness: 0.4 },
+						{ x1 :  20, y1 : 1, x2: 195, y2 : 1, thickness: 0.4 },
+						{ x1 :  20, y1 : 0, x2:  20, y2 : 1, thickness: 0.4 },
+						{ x1 :  35, y1 : 0, x2:  35, y2 : 1, thickness: 0.1 },
+						{ x1 : 105, y1 : 0, x2: 105, y2 : 1, thickness: 0.1 },
+						{ x1 : 175, y1 : 0, x2: 175, y2 : 1, thickness: 0.1 },
+						{ x1 : 185, y1 : 0, x2: 185, y2 : 1, thickness: 0.1 },
+						{ x1 : 195, y1 : 0, x2: 195, y2 : 1, thickness: 0.4 }
+					],
+					answers : [
+						{ x1 : 105, y1 : 0, x2: 195, y2 : 0, thickness: 0.1 }
+					]
+				}
+			};
+			this.getRandomSelection = function(number, categories) {
+				if(!categories) {
+					categories = [];
+					for(var c in app.questions.category)
+						categories.push(c);
+				}
+				
+				var q4cat = [];
+				var questions = [];
+				// check if we got enough questions
+				for(var c in categories)
+					if(app.questions.category[categories[c]].list)
+						q4cat.push({
+							c: categories[c],
+							n: app.questions.category[categories[c]].list.length
+						});
+				var sum = q4cat.reduce(function(p, c) { return p + c.n; }, 0);
+				
+				if(sum < number) {
+					number = sum;
+					
+					for(var i in q4cat)
+						questions.concat(app.questions.category[q4cat[i].c].list);
+				}
+				else {
+					// adjust question number of each cat  
+					for(var i in q4cat)
+						q4cat[i].n *= number / sum;
+					
+					while(questions.length < number) {
+						q4cat.sort(function(a,b){ return b.n - a.n; });
+						var q;
+						do
+						{
+							var num = app.questions.category[q4cat[0].c].list.length;
+							var pick = Math.floor( Math.random() * ( num + 1 ) );
+							q = app.questions.category[q4cat[0].c].list[pick];
+						}
+						while(isNaN(q) || questions.indexOf(q) != -1);
+						questions.push(q);
+						q4cat[0].n -= 1;
+					}
+				}
+				
+				return this.shuffle(questions);
+			}
+			this._layoutQuestion = function(qid, solution) {
+				var q = app.questions.questions[qid];
+				var tq = this.pdf.splitTextToSize(q.question, this.layout.columns.question.width);
+				var ta = [];
+				for(var i in q.answers)
+					if(q.pdfAnswers)
+						ta.push(this.pdf.splitTextToSize(q.pdfAnswers[i], this.layout.columns.answers.width));
+					else
+						ta.push(this.pdf.splitTextToSize(q.answers[i], this.layout.columns.answers.width));
+					
+				var hL = this.layout.fontHeight;
+				var sL = this.layout.fontHeight * this.layout.lineSepFactor;
+				var sP = this.layout.fontHeight * this.layout.paragraphSepFactor;
+				
+				var taLNum = ta.reduce(function(p, c) { return p + c.length; }, 0);
+				var heightQuestion = tq.length * (hL + sL) - sL; // e.g. 3 lines, 2 line separations
+				var heightAnswers = taLNum * (hL + sL) - sL + (ta.length - 1) * (sP - sL);
+				var height = sP + (heightQuestion > heightAnswers ? heightQuestion : heightAnswers);
+				var lines = [];
+				for(var i in this.layout.lines.box)
+					lines.push($.extend({},this.layout.lines.box[i],{
+						y1 : this.layout.lines.box[i].y1 * height, 
+						y2 : this.layout.lines.box[i].y2 * height 
+					}));
+				var textOffset = .775 * hL;
+				
+				// calc in font height units
+				var text = [
+					$.extend({
+						y : textOffset + (height - hL) / 2, 
+						text: q.category + '.' + q.number
+					}, this.layout.columns.nr),
+					$.extend({
+						y : textOffset + (height - tq.length * (hL+sL) + sL) / 2,
+						text : tq
+					}, this.layout.columns.question)
+				];
+				
+				var y = sP / 2;
+				var s = sP;
+				if(heightAnswers < heightQuestion) {
+					s += (heightQuestion - heightAnswers) / ta.length;
+					y = s / 2;
+				}
+				var n = 0;
+				var abc = ['A','B','C'];
+				for(var i in q.answers) {
+					text.push($.extend({
+						y : textOffset + y,
+						text : ta[n]
+					}, this.layout.columns.answers));
+					text.push($.extend({
+						y : textOffset + y + ((ta[n].length - 1) * (hL + sL) + sL) / 2, 
+						text : abc[n],
+					}, this.layout.columns.abc));
+					
+					if($.inArray(parseInt(i), q.correct) != -1 && solution)
+						text.push($.extend({
+							y : textOffset + y + ((ta[n].length - 1) * (hL + sL) + sL) / 2, 
+							text : 'X'
+						}, this.layout.columns.solution));
+					for(var j in this.layout.lines.answers)
+						lines.push($.extend({}, this.layout.lines.answers[j],{
+							y1 : y + (ta[n].length * (hL + sL) - sL) + s / 2,
+							y2 : y + (ta[n].length * (hL + sL) - sL) + s / 2
+						}));
+					y += (ta[n].length * (hL + sL) - sL) + s;
+					n++;
+				}
+				lines.pop();
+				
+				return { height: height, text: text, lines: lines };
+			}
+			this.printQuestionSheet = function(qList, answers) {
+				this.pdf = new jsPDF('p', 'mm', 'a4');
+				this.pdf
+					.setFont(this.layout.font.fontName)
+					.setFontType(this.layout.font.fontStyle)
+					.setFontSize(this.layout.font.fontSize);
+				
+				var yStart = this.layout.border.top;
+				for(var i in qList) {
+					var l = this._layoutQuestion(qList[i], answers);
+					if(yStart + l.height > 297 - this.layout.border.bottom) {
+						this.pdf.addPage();
+						yStart = this.layout.border.top;
+					}
+					
+					for(var t in l.text) {
+						this.pdf.text(
+							l.text[t].x,
+							l.text[t].y + yStart,
+							l.text[t].text
+						);
+						
+					}
+					for(var i in l.lines) {
+						this.pdf.setLineWidth(l.lines[i].thickness);
+						this.pdf.line(
+							l.lines[i].x1, l.lines[i].y1 + yStart, 
+							l.lines[i].x2, l.lines[i].y2 + yStart
+						);
+					}
+					yStart += l.height;
+				}
+				
+				return this.pdf;
+			}
+			this.shuffle = function(o){
+				//+ Jonas Raoni Soares Silva
+				//@ http://jsfromhell.com/array/shuffle [v1.0]
+				for(var j, x, i = o.length; i; j = Math.floor(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+				return o;
+			};
+			
+			
+			this.layout = $.extend(config, this.layout);
+			this.layout.fontHeight = this.layout.font.fontSize / (72 / 25.4);
+		}
 		
 		function THWTheorie_UIHelper(app) {
 			this.app = app;
@@ -334,7 +529,7 @@
 				html += '</h4>';
 
 				html += '<div data-role="fieldcontain">';
-				html += '<fieldset class="answers" data-qid="' + qid + '"data-role="controlgroup">';
+				html += '<fieldset class="answers" data-qid="' + qid + '" data-role="controlgroup">';
 				
 				var answerOrder = [];
 				for(var no in q.answers)
@@ -371,7 +566,7 @@
 //				$('.answers input[type=checkbox]', context).checkboxradio();
 //				$('fieldset', context).controlgroup();
 			}
-		
+			
 			this.learn = {
 				page : '#page-ask',
 				start : function() {
@@ -780,10 +975,64 @@
 					return false;
 				}
 			}
+			this.pdf = {
+				questions : [],
+				show : function(e) {
+					html = '';
+					for(var i in app.questions.category) {
+						html += '<input type="checkbox" id="pdf-cat-' + i + '" data-cat="' + i + '" checked="checked" />';
+						html += '<label for="pdf-cat-' + i + '">' + i + '. ' + app.questions.category[i].name + '</label>';
+					}
+					$('#pdf-cat-select fieldset').html(html)
+					$('#pdf-cat-select').trigger('create');
+					$('#pdf-question-num').attr('max', app.questions.questions.length).slider("refresh");
+					
+					ui.pdf.loadScripts();
+				},
+				loadScripts : function(e) {
+					var loaded = false;
+					try { if(jsPDF) loaded = true; } catch(e) {}
+					if(loaded)
+						return;
+					
+					$.when(
+						$.getScript("js/jspdf.js"),
+						$.getScript("js/jspdf.plugin.standard_fonts_metrics.js"),
+						$.getScript("js/jspdf.plugin.split_text_to_size.js"),
+						$.getScript("js/FileSaver.js/FileSaver.js"),
+						$.getScript("js/Blob.js/BlobBuilder.js")
+					).done(function(){
+						$('#pdf-select-questions').removeClass('ui-disabled');
+					});
+				},
+				select : function() {
+					var cats = [];
+					$('#pdf-cat-select input:checked').each(function(){
+						cats.push($(this).data('cat'));
+					});
+					if(!pdf)
+						pdf = new THWTheorie_PDF()
+					
+					var num = $('#pdf-question-num').val();
+					if(!num) 
+						num = 40;
+					
+					ui.pdf.questions = pdf.getRandomSelection(num, cats);
+					
+					$('#pdf-gen-questions,#pdf-gen-answers').removeClass('ui-disabled');
+				},
+				generate : function(withAnswers) {
+					var pdfFile = pdf.printQuestionSheet(ui.pdf.questions, withAnswers);
+					pdfFile.save(withAnswers ? 'Lösungen.pdf' : 'Fragen.pdf');
+				},
+				genQuestions : function() { ui.pdf.generate(false); },
+				genAnswers : function() { ui.pdf.generate(true); }
+			}
 		}
 		
 		var app;
 		var ui;
+		var pdf = false;
 		try {
 			app = new THWTheorie();
 			ui = new THWTheorie_UIHelper(app);
@@ -825,8 +1074,15 @@
 			$('#set-save').on('click', ui.settings.save);
 			$('#set-reset').on('click', ui.settings.reset);
 			
+			$("#page-pdf").on("pagebeforeshow", ui.pdf.show);
+			$('#pdf-select-questions').on('click', ui.pdf.select);
+			$('#pdf-gen-questions').on('click', ui.pdf.genQuestions);
+			$('#pdf-gen-answers').on('click', ui.pdf.genAnswers);
+			
+			// Exit on phonegap
 			$('#page-mail-exit').toggle(runningOnPhonegap);
 			
+			// reload action
 			$('#update-reload').on('click', function(){ location.reload(); });
 		});
 	</script>
@@ -873,6 +1129,8 @@
 			<hr />
 			<a href="#page-questions" data-role="button">Nachschlagen</a>
 			<a id="m-popup-statistic" href="#popup-statistic" data-rel="popup" data-role="button">Statistik</a>
+			<hr />
+			<a href="#page-pdf" data-role="button">PDF Ausdrucke generieren</a>
 			<hr />
 			<a href="#page-impressum" data-role="button">Infos zur App</a>
 		</div>
@@ -1080,6 +1338,33 @@
 			<hr />
 			<br />
 			<a id="set-reset" href="#" data-rel="back" data-role="button">Einstellungen und Lernfortschritt zurücksetzen</a>
+		</div>
+	</div>
+	<div id="page-pdf" data-role="page">
+		<div data-role="header">
+			<a data-rel="back" data-icon="back">Zurück</a>
+			<h1>THW Theorie</h1>
+		</div>
+		<div data-role="content">
+			<h4>Kategorien für Abfrage-PDF auswählen</h4>
+			<div id="pdf-cat-select" data-role="fieldcontain">
+				<fieldset data-role="controlgroup">
+				</fieldset>
+			</div>
+			<div class="ui-grid-a">
+				<div class="ui-block-a">
+					<label for="pdf-question-num">Anzahl der Fragen:</label>
+				</div>
+				<div class="ui-block-b">
+					<input type="range" id="pdf-question-num" data-highlight="true" min="1" max="" value="40" />
+				</div>	   
+			</div>
+			<a id="pdf-select-questions" class="ui-disabled" data-role="button">Fragenauswahl (neu) erzeugen</a>
+			<hr />
+			<div class="ui-grid-a">
+				<div class="ui-block-a"><a id="pdf-gen-questions" class="ui-disabled" data-role="button">Abfrage-PDF generieren</a></div>
+				<div class="ui-block-b"><a id="pdf-gen-answers" class="ui-disabled" data-role="button">Lösungs-PDF generieren</a></div>     
+			</div>
 		</div>
 	</div>
 	<div id="page-impressum" data-role="page">

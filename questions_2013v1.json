@@ -654,6 +654,11 @@
 			"2": "\u03b2-Strahlung",
 			"3": "\u03b3-Strahlung"
 		},
+		"pdfAnswers": {
+			"1": "Alpha-Strahlung",
+			"2": "Beta-Strahlung",
+			"3": "Gamma-Strahlung"
+		},
 		"correct": [1,2]
 	}, {
 		"category": 2,
