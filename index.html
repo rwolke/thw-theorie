@@ -314,16 +314,34 @@
 				fontHeight : false,
 				lineSepFactor : 0.15,
 				paragraphSepFactor : 0.5,
+				textOffsetFactor : .775,
+				pagesPos : { x: 185, y: 284, text: "[[PAGE]] / [[PAGES]]", font : {} },
+				header : {
+					height : 8,
+					lines : [
+						{ x1 :  20, y1 : 0.5, x2: 195, y2 : 0.5, thickness: 8, color: [230,230,230] },
+						{ x1 :  20, y1 : 0, x2: 195, y2 : 0, thickness: 0.4 },
+						{ x1 :  20, y1 : 1, x2: 195, y2 : 1, thickness: 0.4 },
+						{ x1 :  20, y1 : 0, x2:  20, y2 : 1, thickness: 0.4 },
+						{ x1 : 195, y1 : 0, x2: 195, y2 : 1, thickness: 0.4 },
+						{ x1 :  35, y1 : 0, x2:  35, y2 : 1, thickness: 0.1 },
+						{ x1 : 105, y1 : 0, x2: 105, y2 : 1, thickness: 0.1 }
+					],
+					text : [
+						{ x:  22.5, y : 0, text : 'Nr.', font: {fontStyle: 'bold'}  },
+						{ x:  37.5, y : 0, text : 'Frage', font: {fontStyle: 'bold'}  },
+						{ x: 107.5, y : 0, text : 'Antwortmöglichkeit(en) / Lösung', font: {fontStyle: 'bold'} }
+					] 
+				},
 				columns : {
 					nr : { x : 22.5 },
 					question : { x : 37.5, width: 65 },
-					answers : { x : 107.5, width: 65},
-					abc : { x : 178.5},
-					solution : { x : 188.5 }
+					answers : { x : 107.5, width: 65 },
+					abc : { x : 178.5 },
+					solution : { x : 188.5, font: {fontStyle: 'bold'} }
 				},
 				lines : {
 					box : [
-						{ x1 :  20, y1 : 0, x2: 195, y2 : 0, thickness: 0.4 },
 						{ x1 :  20, y1 : 1, x2: 195, y2 : 1, thickness: 0.4 },
 						{ x1 :  20, y1 : 0, x2:  20, y2 : 1, thickness: 0.4 },
 						{ x1 :  35, y1 : 0, x2:  35, y2 : 1, thickness: 0.1 },
@@ -383,6 +401,22 @@
 				
 				return this.shuffle(questions);
 			}
+			this.lastFont = {fontSize: 0, fontStyle: false, fontName: false};
+			this.text = function(x,y,text,font) {
+				var f = $.extend({}, this.layout.font, font);
+				
+				if(f.fontName != this.lastFont.fontName)
+					this.pdf.setFont(f.fontName);
+				if(f.fontStyle != this.lastFont.fontStyle)
+					this.pdf.setFontType(f.fontStyle);
+				if(f.fontSize != this.lastFont.fontSize)
+					this.pdf.setFontSize(f.fontSize);
+				
+				for(var i in f)
+					this.lastFont[i] = f[i];
+				
+				return this.pdf.text(x,y,text);
+			}
 			this._layoutQuestion = function(qid, solution) {
 				var q = app.questions.questions[qid];
 				var tq = this.pdf.splitTextToSize(q.question, this.layout.columns.question.width);
@@ -407,7 +441,7 @@
 						y1 : this.layout.lines.box[i].y1 * height, 
 						y2 : this.layout.lines.box[i].y2 * height 
 					}));
-				var textOffset = .775 * hL;
+				var textOffset = hL * this.layout.textOffsetFactor;
 				
 				// calc in font height units
 				var text = [
@@ -458,24 +492,52 @@
 			}
 			this.printQuestionSheet = function(qList, answers) {
 				this.pdf = new jsPDF('p', 'mm', 'a4');
-				this.pdf
-					.setFont(this.layout.font.fontName)
-					.setFontType(this.layout.font.fontStyle)
-					.setFontSize(this.layout.font.fontSize);
 				
-				var yStart = this.layout.border.top;
+				var page = 0;
+				var yStart;
 				for(var i in qList) {
 					var l = this._layoutQuestion(qList[i], answers);
-					if(yStart + l.height > 297 - this.layout.border.bottom) {
-						this.pdf.addPage();
+					if(yStart + l.height > 297 - this.layout.border.bottom || page == 0) {
+						if(page++) 
+							this.pdf.addPage();
+						if(this.layout.pagesPos)
+							this.text(
+								this.layout.pagesPos.x,
+								this.layout.pagesPos.y,
+								this.layout.pagesPos.text.replace(/\[\[PAGE\]\]/g, page),
+								typeof(this.layout.pagesPos.font) !== 'undefined' ? this.layout.pagesPos.font : {}
+							);
 						yStart = this.layout.border.top;
+						for(var i in this.layout.header.lines) {
+							if(typeof(this.layout.header.lines[i].color) === 'undefined')
+								this.pdf.setDrawColor(0,0,0);
+							else
+								this.pdf.setDrawColor(
+									this.layout.header.lines[i].color[0], this.layout.header.lines[i].color[0], this.layout.header.lines[i].color[2]
+								);
+							
+							this.pdf.setLineWidth(this.layout.header.lines[i].thickness);
+							this.pdf.line(
+								this.layout.header.lines[i].x1, this.layout.header.lines[i].y1 * this.layout.header.height + yStart, 
+								this.layout.header.lines[i].x2, this.layout.header.lines[i].y2 * this.layout.header.height + yStart
+							);
+						}
+						for(var t in this.layout.header.text)
+							this.text(
+								this.layout.header.text[t].x,
+								this.layout.header.text[t].y + yStart + (this.layout.paragraphSepFactor + this.layout.textOffsetFactor) * this.layout.fontHeight,
+								this.layout.header.text[t].text,
+								typeof(this.layout.header.text[t].font) !== 'undefined' ? this.layout.header.text[t].font : {}
+							);
+						yStart += this.layout.header.height;
 					}
 					
 					for(var t in l.text) {
-						this.pdf.text(
+						this.text(
 							l.text[t].x,
 							l.text[t].y + yStart,
-							l.text[t].text
+							l.text[t].text,
+							typeof(l.text[t].font) !== 'undefined' ? l.text[t].font : {}
 						);
 						
 					}
@@ -488,6 +550,8 @@
 					}
 					yStart += l.height;
 				}
+				if(this.layout.pagesPos)
+					this.pdf.putTotalPages('\\[\\[PAGES\\]\\]');
 				
 				return this.pdf;
 			}
@@ -999,6 +1063,7 @@
 						$.getScript("js/jspdf.js"),
 						$.getScript("js/jspdf.plugin.standard_fonts_metrics.js"),
 						$.getScript("js/jspdf.plugin.split_text_to_size.js"),
+						$.getScript("js/jspdf.plugin.total_pages.js"),
 						$.getScript("js/FileSaver.js/FileSaver.js"),
 						$.getScript("js/Blob.js/BlobBuilder.js")
 					).done(function(){
