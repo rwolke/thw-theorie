@@ -46,10 +46,11 @@
 			};
 			this.questionSets = {
 				"2006" : {name: "Stand 2006", file:"questions_2006v1.json"},
-				"2013" : {name: "Stand 2013", file:"questions_2013v1.json"}
+				"2013" : {name: "Stand 2013", file:"questions_2013v1.json"},
+				"2014" : {name: "Stand 2014 v2.0", file:"questions_2014v1.json"}
 			}
 			this.defaultSettings = {
-				selectedQuestionSet: "2013",
+				selectedQuestionSet: "2014",
 				randomizeQuestions : false
 			};
 			this.loadedFromStorage = [];
@@ -376,7 +377,7 @@
 					number = sum;
 					
 					for(var i in q4cat)
-						questions.concat(app.questions.category[q4cat[i].c].list);
+						questions = questions.concat(app.questions.category[q4cat[i].c].list);
 				}
 				else {
 					// adjust question number of each cat  
@@ -491,6 +492,7 @@
 			}
 			this.printQuestionSheet = function(qList, answers) {
 				this.pdf = new jsPDF('p', 'mm', 'a4');
+				this.lastFont = {fontSize: 0, fontStyle: false, fontName: false};
 				
 				var page = 0;
 				var yStart;
