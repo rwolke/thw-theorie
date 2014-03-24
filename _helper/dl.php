@@ -16,7 +16,6 @@
 	// replace  
 	function r($in) {
 		return strtr($in, array(
-			'60, 00 m' => '60,00 m'
 		));
 	}
 	
@@ -31,8 +30,7 @@
 		$p = strpos($c, '<h1>');
 		$s = returnSection($c, $p, '<b>', '</b>');
 		$category[$cat] = array(
-			'name' => html_entity_decode(strip_tags($s), ENT_COMPAT, 'UTF-8'),
-			'list' => array()
+			'name' => html_entity_decode(strip_tags($s), ENT_COMPAT, 'UTF-8')
 		);
 		
 		$tableP = 0;
@@ -65,7 +63,6 @@
 						$q['correct'][] = $i+1;
 				}
 			
-			$category[$cat]['list'][] = count($questions);
 			$questions[] = $q;
 		}
 		echo 'done!'."\n";

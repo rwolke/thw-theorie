@@ -402,7 +402,7 @@
 				return this.shuffle(questions);
 			}
 			this.lastFont = {fontSize: 0, fontStyle: false, fontName: false};
-			this.text = function(x,y,text,font) {
+			this.setFont = function(font) {
 				var f = $.extend({}, this.layout.font, font);
 				
 				if(f.fontName != this.lastFont.fontName)
@@ -414,7 +414,9 @@
 				
 				for(var i in f)
 					this.lastFont[i] = f[i];
-				
+			}
+			this.text = function(x,y,text,font) {
+				this.setFont(font);
 				return this.pdf.text(x,y,text);
 			}
 			this._layoutQuestion = function(qid, solution) {
@@ -497,6 +499,7 @@
 				var page = 0;
 				var yStart;
 				for(var i in qList) {
+					this.setFont({});
 					var l = this._layoutQuestion(qList[i], answers);
 					if(yStart + l.height > 297 - this.layout.border.bottom || page == 0) {
 						if(page++) 
@@ -1088,14 +1091,16 @@
 					
 					ui.pdf.questions = pdf.getRandomSelection(num, cats);
 					
-					$('#pdf-gen-questions,#pdf-gen-answers').removeClass('ui-disabled');
+					$('#pdf-show-questions,#pdf-show-answers').removeClass('ui-disabled');
+					$('#pdf-save-questions,#pdf-save-answers').removeClass('ui-disabled');
 				},
-				generate : function(withAnswers) {
-					var pdfFile = pdf.printQuestionSheet(ui.pdf.questions, withAnswers);
-					pdfFile.save(withAnswers ? 'Lösungen.pdf' : 'Fragen.pdf');
+				generate : function(action, type) {
+					var pdfFile = pdf.printQuestionSheet(ui.pdf.questions, type == 'answers');
+					if(action == 'save')
+						pdfFile.save(type == 'answers' ? 'Lösungen.pdf' : 'Fragen.pdf');
+					else
+						pdfFile.output('dataurlnewwindow');
 				},
-				genQuestions : function() { ui.pdf.generate(false); },
-				genAnswers : function() { ui.pdf.generate(true); }
 			}
 		}
 		
@@ -1145,8 +1150,11 @@
 			
 			$("#page-pdf").on("pagebeforeshow", ui.pdf.show);
 			$('#pdf-select-questions').on('click', ui.pdf.select);
-			$('#pdf-gen-questions').on('click', ui.pdf.genQuestions);
-			$('#pdf-gen-answers').on('click', ui.pdf.genAnswers);
+			
+			$('#pdf-show-questions').on('click', function(){ ui.pdf.generate('show','questions'); });
+			$('#pdf-show-answers').on('click', function(){ ui.pdf.generate('show','answers'); });
+			$('#pdf-save-questions').on('click', function(){ ui.pdf.generate('save','questions'); });
+			$('#pdf-save-answers').on('click', function(){ ui.pdf.generate('save','answers'); });
 			
 			// Exit on phonegap
 			$('#page-mail-exit').toggle(runningOnPhonegap);
@@ -1431,8 +1439,12 @@
 			<a id="pdf-select-questions" class="ui-disabled" data-role="button">Fragenauswahl (neu) erzeugen</a>
 			<hr />
 			<div class="ui-grid-a">
-				<div class="ui-block-a"><a id="pdf-gen-questions" class="ui-disabled" data-role="button">Abfrage-PDF generieren</a></div>
-				<div class="ui-block-b"><a id="pdf-gen-answers" class="ui-disabled" data-role="button">Lösungs-PDF generieren</a></div>     
+				<div class="ui-block-a"><a id="pdf-show-questions" class="ui-disabled" data-role="button">Abfrage-PDF anzeigen</a></div>
+				<div class="ui-block-b"><a id="pdf-show-answers" class="ui-disabled" data-role="button">Lösungs-PDF anzeigen</a></div>
+			</div>
+			<div class="ui-grid-a">
+				<div class="ui-block-a"><a id="pdf-save-questions" class="ui-disabled" data-role="button">Abfrage-PDF speichern</a></div>
+				<div class="ui-block-b"><a id="pdf-save-answers" class="ui-disabled" data-role="button">Lösungs-PDF speichern</a></div>
 			</div>
 		</div>
 	</div>
