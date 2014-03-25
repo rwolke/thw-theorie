@@ -23,16 +23,27 @@
 	<script src="js/jquery.mobile-1.3.1.min.js"></script>
 	<script>
 		var runningOnPhonegap = false;
-		window.addEventListener('online', function(){});
-		window.addEventListener('offline', function(){});
-		try{
+		var onlineState = navigator.onLine;
+		$(function(){
+			function setOnlineState(online) {
+				onlineState = online;
+				$('#page-main a[href=#page-pdf]').toggleClass('ui-disabled', !onlineState);
+			}
+			
+			window.addEventListener('online', function(){ setOnlineState(true); });
+			window.addEventListener('offline', function(){ setOnlineState(false); });
+			setOnlineState(onlineState);
+		});
+		
+		try {
 			window.applicationCache.addEventListener('updateready', function(){
 				$('#popup-update').popup();
 				$('#popup-update').popup("open");
 			}, false);
-		}catch(e){}
+		}
+		catch(e){}
 		$(document).ajaxError(function(event, request, settings, error ) {
-			alert('Benötigte Datei "' + settings.url + '" konnte nicht geladen werden!\n' + errror);
+			alert('Benötigte Datei "' + settings.url + '" konnte nicht geladen werden!\n' + error);
 		});
 		
 		function THWTheorie() {
@@ -45,9 +56,9 @@
 				applicationCache : false
 			};
 			this.questionSets = {
-				"2006" : {name: "Stand 2006", file:"questions_2006v1.json"},
-				"2013" : {name: "Stand 2013", file:"questions_2013v1.json"},
-				"2014" : {name: "Stand 2014 v2.0", file:"questions_2014v1.json"}
+				"2006" : {name: "2006", file:"questions_2006v1.json"},
+				"2013" : {name: "2013", file:"questions_2013v1.json"},
+				"2014" : {name: "2014 v2.0", file:"questions_2014v1.json"}
 			}
 			this.defaultSettings = {
 				selectedQuestionSet: "2014",
@@ -631,8 +642,6 @@
 					$('.title', context).text('Frage ' + q.category + '.' + q.number);
 				
 				$('.question', context).html(html).trigger('create');
-//				$('.answers input[type=checkbox]', context).checkboxradio();
-//				$('fieldset', context).controlgroup();
 			}
 			
 			this.learn = {
@@ -1111,9 +1120,8 @@
 			app = new THWTheorie();
 			ui = new THWTheorie_UIHelper(app);
 		} catch(e) {
-			alert(e.message);
-//			console.log(e.stack, e.message);
 			// @todo display startup errors
+			alert(e.message);
 		}
 		
 		$(document).ready(function(){
@@ -1189,6 +1197,7 @@
 		h4 { font-size:1.0em !important; max-height: 999999px; }
 		p { max-height: 999999px; }
 		#page-settings .field-randomizeQuestions .ui-slider-switch { width:99% }
+		.pdflink .ui-btn-inner { padding:.6em 5px; }
 	</style>
 </head>
 <body>
@@ -1439,12 +1448,12 @@
 			<a id="pdf-select-questions" class="ui-disabled" data-role="button">Fragenauswahl (neu) erzeugen</a>
 			<hr />
 			<div class="ui-grid-a">
-				<div class="ui-block-a"><a id="pdf-show-questions" class="ui-disabled" data-role="button">Abfrage-PDF anzeigen</a></div>
-				<div class="ui-block-b"><a id="pdf-show-answers" class="ui-disabled" data-role="button">Lösungs-PDF anzeigen</a></div>
+				<div class="ui-block-a"><a id="pdf-show-questions" class="ui-disabled pdflink" data-role="button">Fragen anzeigen</a></div>
+				<div class="ui-block-b"><a id="pdf-show-answers" class="ui-disabled pdflink" data-role="button">Lösungen anzeigen</a></div>
 			</div>
 			<div class="ui-grid-a">
-				<div class="ui-block-a"><a id="pdf-save-questions" class="ui-disabled" data-role="button">Abfrage-PDF speichern</a></div>
-				<div class="ui-block-b"><a id="pdf-save-answers" class="ui-disabled" data-role="button">Lösungs-PDF speichern</a></div>
+				<div class="ui-block-a"><a id="pdf-save-questions" class="ui-disabled pdflink" data-role="button">Fragen speichern</a></div>
+				<div class="ui-block-b"><a id="pdf-save-answers" class="ui-disabled pdflink" data-role="button">Lösungen speichern</a></div>
 			</div>
 		</div>
 	</div>
