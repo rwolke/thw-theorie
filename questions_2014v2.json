@@ -1102,7 +1102,7 @@
 	}, {
 		"category": 5,
 		"number": 13,
-		"question": "Welche Gesamtl\u00e4nge k\u00f6nnen die Leitung eines Leitungsrollers (230 V Schukostecker, 3 x 230 V Schukosteckdose) haben?",
+		"question": "Welche Gesamtl\u00e4nge k\u00f6nnen die Leitungen eines Leitungsrollers (230 V Schukostecker, 3 x 230 V Schukosteckdose) haben?",
 		"answers": {
 			"1": "40,00 m",
 			"2": "50,00 m",
