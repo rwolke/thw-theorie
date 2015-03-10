@@ -74,5 +74,5 @@
 		'questions' => $questions
 	);
 	
-	file_put_contents('questions.json', json_encode($export));
+	file_put_contents('questions.json', json_encode($export, JSON_PRETTY_PRINT));
 ?>

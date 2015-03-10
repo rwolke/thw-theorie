@@ -7,10 +7,6 @@ Die Anwendung kann in allen modernen Browsern, ob mobil oder am PC, offline verw
 
 Zusätzlich verfügt das Programm über einen [PDF-Generator][4] mit dem Abfrage-Bögen erstellt werden können.
 
-## Besonderer Dank
-
-Mein Dank gilt [Kai Blaschke][2] der den Fragenkatalog in einer [maschinenlesbaren Form][3] auf seiner Seite [thw-theorie.de][2] integriert und kostenlos zur freien Verfügung gestellt hat.
-
 ## Lizenz
 
 <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/de/"><img alt="Creative Commons Lizenzvertrag" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-sa/3.0/de/88x31.png" /></a>  
