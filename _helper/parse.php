@@ -27,30 +27,37 @@
 	define('L', 3);
 	
 	class Page {
+		const POS_VERSION_Y_MIN = 800;
+
 		private $_words = [];
+		private $_version = '';
 		private $_columns = [];
 		private $_tableHeader = false;
 		private $_yMin = 0;
 		private $_yMax = 0;
 		
+		private function _getVersion() {
+			foreach($this->_words AS $i => $w)
+				if($w[T] == 'Version' && $w[Y] > self::POS_VERSION_Y_MIN)
+					$this->_version = $this->_words[$i+1][T];
+		}
+
 		private function _findLayout() {
-			$this->_yMax = 0;
-			foreach($this->_words AS $w)
-				if($w[T] == 'Nr.' && $w[X] < 100) {
-					$this->_tableHeader = [X => $w[X], Y => $w[Y]];
-					$this->_yMin = $w[Y] + 5;
-				}
-				elseif($w[T] == 'C' && $w[X] > 480)
-					$this->_yMax = max($this->_yMax, $w[Y]);
-			
-			$footerY = 0;
-			foreach($this->_words AS $w)
-				if($w[T] == 'Referat' && $w[Y] > $this->_yMax)
-					$footerY = $w[Y];
-			
-			foreach($this->_words AS $w)
-				if($w[Y] < $footerY - 5)
-					$this->_yMax = $w[Y];
+			if($this->_version == '3.3') {
+				$this->_yMin = 160;
+				$this->_yMax = 790;
+				$this->_tableHeader = [
+					X => 67,
+					Y => 153
+				];
+				$this->_columns = [
+					60,
+					97,
+					257,
+					495,
+					520
+				];
+			}
 		}
 		
 		private function _countElementsOnAxis(&$elements, $axis, $weightCB) {
@@ -97,31 +104,6 @@
 				return 2;
 			return 1;
 		}
-		private function _findAndSaveColums($num) {
-			$this->_columns[0] = $this->_tableHeader[X] - 5;
-			
-			$frage = null;
-			$aw = null;
-			foreach($this->_words AS $w)
-				if($w[T] == 'Frage' && $w[Y] >= $this->_tableHeader[Y] - 5 && $w[Y] <= $this->_tableHeader[Y] + 5)
-					$this->_columns[1] = $w[X] - 5;
-				elseif($w[T] == 'Antwortmöglichkeit(en)' && $w[Y] >= $this->_tableHeader[Y] - 5 && $w[Y] <= $this->_tableHeader[Y] + 5) 
-					$this->_columns[2] = $w[X] - 5;
-			
-			$abc = [];
-			$xxx = [];
-			foreach($this->_words AS $w) {
-				if($w[X] > $this->_columns[2]) {
-					if($w[T] == 'X')
-						$xxx[] = [$w[X], 1];
-					elseif(strpos('ABC', $w[T]) !== false)
-						$abc[] = [$w[X], 1];
-				}
-			}
-				
-			$this->_columns[3] = $this->_getConsensus($abc);
-			$this->_columns[4] = $this->_getConsensus($xxx);
-		}
 		
 		private function _extractColumnElements($column) {
 			assert(isset($this->_columns[$column]));
@@ -144,12 +126,13 @@
 				if($d > 0.2 && $d < 25)
 					$diff[] = [$d, 1];
 			}
-			
 			$this->_lineHeight = $this->_getConsensus($diff);
 		}
 		
 		public function __construct($page) {
 			$this->_words = $page;
+			$this->_getVersion();
+
 			usort($this->_words, function($a,$b){
 				return $a[Y] == $b[Y] ? (
 					$a[X] == $b[X] ? 0 : (
@@ -160,7 +143,6 @@
 				);
 			});
 			$this->_findLayout();
-			$this->_findAndSaveColums(5);
 			$this->_findLineHeight();
 		}
 		
@@ -280,20 +262,23 @@
 			$start = $this->_tableHeader[Y] + $this->_lineHeight / 2;
 			foreach($this->_extractColumnElements(0) AS $nr)
 			{
-				list($cat, $num) = explode('.', $nr[T]);
-				$hHalb = ($nr[Y] - $start);
-				$start += 2 * $hHalb;
+				$catnum = explode('.', $nr[T]);
+				if(count($catnum) != 2 || !intval($catnum[0]) || !intval($catnum[1]))
+					continue;
+				if(count($fragen))
+					$fragen[count($fragen) - 1]['_yMax'] = $nr[Y]-5;
+				
 				$fragen[] = [
 					'_nr' => $nr[T],
-					'category' => intval($cat),
-					'number' => intval($num),
+					'category' => intval($catnum[0]),
+					'number' => intval($catnum[1]),
 					'question' => '',
 					'answers' => '',
 					'correct' => [],
 					'_text' => [],
 					'_AWs' => [],
-					'_yMin' => $nr[Y] - $hHalb,
-					'_yMax' => $nr[Y] + $hHalb,
+					'_yMin' => $nr[Y]-5,
+					'_yMax' => $this->_yMax - 5,
 					'_yABC' => []
 				];
 			}
@@ -312,7 +297,6 @@
 					'_yMax' => $start + 2 * ($abc[Y] - $start)
 				];
 			}
-			
 			foreach($this->_extractColumnElements(1) AS $text) {
 				$selF = $this->_getIndexForText($fragen, $text);
 				$fragen[$selF]['_text'][] = $text;
@@ -369,5 +353,5 @@
 	];
 	file_put_contents($argv[1].'.json', json_encode($data, JSON_PRETTY_PRINT));
 	
-	unlink('fragen.xml');
+//	unlink('fragen.xml');
 ?>
